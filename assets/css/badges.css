@@ -1,0 +1,81 @@
+/* assets/css/badges.css
+   Badges de estado y etiquetas
+   ============================================ */
+
+/* ===== Estado badges generales ===== */
+.estado-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: inline-block;
+    white-space: nowrap;
+}
+
+/* Estados de proyecto */
+.estado-solicitado { background-color: #e0e0e0; color: #333; }
+.estado-orçado { background-color: #fff3cd; color: #856404; }
+.estado-pendente_aprovacion_cliente { background-color: #ffe5b4; color: #856404; }
+.estado-aprovado_cliente { background-color: #d4edda; color: #155724; }
+.estado-espera_orden_compra { background-color: #cce5ff; color: #004085; }
+.estado-comprando_materiales { background-color: #d6d8db; color: #383d41; }
+.estado-elaboracion { background-color: #f8d7da; color: #721c24; }
+.estado-terminado { background-color: #d1ecf1; color: #0c5460; }
+.estado-pendiente_cobro_cliente { background-color: #ffe5b4; color: #856404; }
+.estado-finalizado { background-color: #d4edda; color: #155724; }
+
+/* Estados de item */
+.estado-pendiente { background-color: #ffe5b4; color: #856404; }
+.estado-stock { background-color: #d4edda; color: #155724; }
+.estado-cotacion { background-color: #cce5ff; color: #004085; }
+.estado-pendiente_pago { background-color: #f8d7da; color: #721c24; }
+.estado-comprado_llegar { background-color: #d6d8db; color: #383d41; }
+.estado-llego { background-color: #d4edda; color: #155724; }
+
+/* ===== Badge Master ===== */
+.badge-master {
+    display: inline-block;
+    background: linear-gradient(135deg, #f39c12, #e67e22);
+    color: white;
+    font-size: 0.65rem;
+    font-weight: bold;
+    padding: 0.15rem 0.45rem;
+    border-radius: 10px;
+    margin-left: 0.5rem;
+    letter-spacing: 0.5px;
+    vertical-align: middle;
+}
+
+/* ===== Badge Orden de Compra ===== */
+.badge-oc {
+    display: inline-block;
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid #c8e6c9;
+    white-space: nowrap;
+}
+
+.sin-oc {
+    color: #bdc3c7;
+    font-size: 1rem;
+}
+
+/* ===== Badge Categoría ===== */
+.cat-badge {
+    display: inline-block;
+    background: #e3f2fd;
+    color: #1565c0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    white-space: nowrap;
+}
+
+.sin-cat {
+    color: #bdc3c7;
+}

@@ -1,0 +1,77 @@
+/* assets/css/style.css
+   Variables globales, reset y layout base.
+   Los estilos específicos están en archivos separados.
+   ============================================ */
+
+/* ===== Variables CSS ===== */
+:root {
+    --primary-color: #2c3e50;
+    --secondary-color: #3498db;
+    --success-color: #27ae60;
+    --warning-color: #f39c12;
+    --danger-color: #e74c3c;
+    --light-color: #ecf0f1;
+    --dark-color: #2c3e50;
+    
+    --bg-body: #f5f6fa;
+    --bg-white: #ffffff;
+    --text-color: #333;
+    --text-muted: #7f8c8d;
+    --text-light: #95a5a6;
+    
+    --border-color: #e9ecef;
+    --border-color-dark: #dee2e6;
+    
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 10px;
+    
+    --shadow-sm: 0 2px 8px rgba(0,0,0,0.06);
+    --shadow-md: 0 2px 10px rgba(0,0,0,0.08);
+    --shadow-lg: 0 10px 40px rgba(0,0,0,0.2);
+    --shadow-xl: 0 20px 60px rgba(0,0,0,0.3);
+}
+
+/* ===== Reset ===== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* ===== Base ===== */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-body);
+    color: var(--text-color);
+}
+
+/* ===== Contenedor principal ===== */
+.container {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+/* ===== Page Header genérico ===== */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.page-header h1 {
+    margin: 0;
+}
+
+/* ===== Responsive global ===== */
+@media (max-width: 768px) {
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

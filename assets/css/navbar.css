@@ -1,0 +1,56 @@
+/* assets/css/navbar.css
+   Estilos del header y navegación
+   ============================================ */
+
+.navbar {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav-brand h2 {
+    margin: 0;
+}
+
+.nav-menu {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.nav-menu li a {
+    color: white;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-sm);
+    transition: background-color 0.3s;
+}
+
+.nav-menu li a:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.idioma-select {
+    padding: 0.3rem 0.5rem;
+    border-radius: var(--radius-sm);
+    border: none;
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .navbar {
+        flex-direction: column;
+        padding: 1rem;
+    }
+    
+    .nav-menu {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+}

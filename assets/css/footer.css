@@ -1,0 +1,68 @@
+/* assets/css/footer.css
+   Estilos exclusivos del footer y el layout sticky
+   ============================================ */
+
+/* Layout general para que el footer siempre quede abajo */
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+main {
+    flex: 1 0 auto;   /* El main ocupa todo el espacio disponible */
+    width: 100%;
+}
+
+/* ============================================
+   FOOTER
+   ============================================ */
+.main-footer {
+    flex-shrink: 0;   /* El footer nunca se encoge */
+    background-color: var(--primary-color, #2c3e50);
+    color: white;
+    padding: 1rem 2rem;
+    margin-top: 3rem;
+    width: 100%;
+}
+
+.footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.footer-content p {
+    margin: 0;
+}
+
+.footer-version {
+    opacity: 0.7;
+    font-size: 0.85rem;
+}
+
+/* ============================================
+   Responsive
+   ============================================ */
+@media (max-width: 768px) {
+    .footer-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .main-footer {
+        padding: 0.85rem 1rem;
+        margin-top: 2rem;
+    }
+}

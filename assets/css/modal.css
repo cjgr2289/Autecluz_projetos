@@ -1,0 +1,182 @@
+/* assets/css/modal.css
+   Estilos del modal de productos
+   ============================================ */
+
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    padding: 1rem;
+}
+
+.modal-content {
+    background: white;
+    border-radius: var(--radius-xl);
+    width: 100%;
+    max-width: 600px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-xl);
+}
+
+.modal-large {
+    max-width: 900px;
+}
+
+.modal-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--primary-color);
+    color: white;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.8rem;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-section {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #eee;
+}
+
+.modal-section:last-child {
+    border-bottom: none;
+}
+
+.modal-section h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: var(--primary-color);
+    font-size: 1.05rem;
+}
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+}
+
+/* Lista de productos dentro del modal */
+.productos-lista {
+    max-height: 250px;
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+    border-radius: var(--radius-md);
+    margin-bottom: 1rem;
+}
+
+.tabla-productos {
+    width: 100%;
+    border-collapse: collapse;
+    box-shadow: none;
+    margin: 0;
+}
+
+.tabla-productos th {
+    background: #f0f2f5;
+    color: #333;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    position: sticky;
+    top: 0;
+}
+
+.tabla-productos td {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+/* Items pendientes */
+.tabla-items-pendientes {
+    width: 100%;
+    border-collapse: collapse;
+    box-shadow: none;
+    margin: 0;
+}
+
+.tabla-items-pendientes th {
+    background: #f0f2f5;
+    color: #333;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.85rem;
+}
+
+.tabla-items-pendientes td {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.9rem;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.items-pendientes {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+    border-radius: var(--radius-md);
+}
+
+.nuevo-producto-toggle {
+    margin-top: 0.5rem;
+    text-align: center;
+}
+
+.nuevo-producto-form {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: var(--radius-md);
+    border: 1px dashed #ccc;
+}
+
+.nuevo-producto-form h4 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+}
+
+.empty-msg {
+    padding: 1.5rem;
+    text-align: center;
+    color: #999;
+    font-style: italic;
+}
+
+.btn-agregar-item {
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 1rem;
+    margin-top: 0.5rem;
+}
+
+body.modal-open {
+    overflow: hidden;
+}

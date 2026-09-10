@@ -1,0 +1,207 @@
+/* assets/css/items.css
+   Estilos de items y su historial
+   ============================================ */
+
+/* ===== Tabla de items ===== */
+.tabla-items {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+}
+
+.tabla-items th {
+    background: #f8f9fa;
+    color: var(--primary-color);
+    padding: 0.6rem 0.65rem;
+    text-align: left;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    border-bottom: 2px solid var(--border-color-dark);
+    white-space: nowrap;
+}
+
+.tabla-items td {
+    padding: 0.65rem;
+    border-bottom: 1px solid #eef0f2;
+    vertical-align: middle;
+}
+
+.tabla-items tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.tabla-items .col-item-nombre {
+    min-width: 200px;
+    max-width: 350px;
+}
+
+.tabla-items .col-item-cat {
+    white-space: nowrap;
+}
+
+.tabla-items .col-item-cant,
+.tabla-items .col-item-unidad,
+.tabla-items .col-item-fecha {
+    white-space: nowrap;
+    color: #555;
+}
+
+.tabla-items .col-item-estado {
+    white-space: nowrap;
+}
+
+.tabla-items .col-item-acciones {
+    white-space: nowrap;
+    text-align: center;
+    width: 1%;
+}
+
+.item-nombre {
+    font-weight: 600;
+    color: var(--primary-color);
+    line-height: 1.3;
+    word-break: break-word;
+}
+
+.item-nota {
+    font-size: 0.72rem;
+    color: var(--text-light);
+    margin-top: 0.15rem;
+    line-height: 1.3;
+}
+
+/* ============================================
+   HISTORIAL
+   ============================================ */
+.historial-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.historial-item {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: #f8f9fa;
+    border-left: 3px solid var(--secondary-color);
+    border-radius: var(--radius-md);
+    transition: background 0.15s;
+}
+
+.historial-item:hover {
+    background: #eff2f5;
+}
+
+.historial-icon {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    display: flex;
+    align-items: flex-start;
+    padding-top: 2px;
+}
+
+.historial-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.historial-item-nombre {
+    font-size: 0.85rem;
+    color: var(--primary-color);
+    margin-bottom: 0.3rem;
+}
+
+.historial-linea-1 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.3rem;
+}
+
+.historial-linea-1 .estado-badge {
+    font-size: 0.72rem;
+}
+
+.historial-arrow {
+    color: var(--text-light);
+    font-weight: bold;
+    font-size: 0.85rem;
+}
+
+.historial-linea-2 {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    font-size: 0.76rem;
+    color: var(--text-muted);
+}
+
+.historial-usuario,
+.historial-fecha {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.historial-comentario {
+    margin-top: 0.4rem;
+    padding: 0.4rem 0.6rem;
+    background: white;
+    border-left: 2px solid var(--border-color-dark);
+    font-size: 0.8rem;
+    color: #555;
+    border-radius: 3px;
+    font-style: italic;
+}
+
+/* ============================================
+   EMPTY STATE
+   ============================================ */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-light);
+}
+
+.empty-icon {
+    font-size: 3rem;
+    margin-bottom: 0.75rem;
+    opacity: 0.5;
+}
+
+.empty-state p {
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 768px) {
+    .tabla-items {
+        font-size: 0.8rem;
+    }
+    
+    .tabla-items th,
+    .tabla-items td {
+        padding: 0.5rem 0.4rem;
+    }
+    
+    .tabla-items .col-item-cat {
+        display: none;
+    }
+    
+    .item-nota {
+        display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .tabla-items .col-item-fecha {
+        display: none;
+    }
+}
