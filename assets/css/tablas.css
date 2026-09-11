@@ -34,3 +34,10 @@ table tbody tr:nth-child(even) {
 table tbody tr:hover {
     background-color: #e9ecef;
 }
+
+.empty-cell {
+    text-align: center;
+    padding: 2rem !important;
+    color: var(--text-light, #95a5a6);
+    font-style: italic;
+}

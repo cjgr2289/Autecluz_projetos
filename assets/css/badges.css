@@ -79,3 +79,8 @@
 .sin-cat {
     color: #bdc3c7;
 }
+
+/* Candado: categoría en uso */
+.btn-icon[style*="cursor:not-allowed"] {
+    pointer-events: none;
+}

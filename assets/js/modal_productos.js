@@ -101,9 +101,13 @@ function renderizarProductos(productos) {
 function seleccionarProducto(producto) {
     document.getElementById('item-producto-id').value = producto.id;
     document.getElementById('item-nombre').value = producto.nombre;
-    document.getElementById('item-unidad').value = producto.unidad_medida || '';
     
-    // Scroll a la sección de detalles
+    // Ahora es un select, se asigna directo con value
+    const unidadSelect = document.getElementById('item-unidad');
+    if (unidadSelect) {
+        unidadSelect.value = producto.unidad_medida || '';
+    }
+    
     document.getElementById('item-cantidad').focus();
 }
 

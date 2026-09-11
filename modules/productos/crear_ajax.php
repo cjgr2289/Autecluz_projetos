@@ -19,6 +19,12 @@ if (empty($nombre)) {
     exit();
 }
 
+// Validar unidad
+if (!empty($unidad_medida) && !esUnidadValida($unidad_medida)) {
+    echo json_encode(['success' => false, 'error' => 'Unidad de medida no válida']);
+    exit();
+}
+
 try {
     $stmt = $db->prepare("INSERT INTO productos (nombre, descripcion, categoria_id, unidad_medida, codigo, usuario_creacion)
                          VALUES (?, ?, ?, ?, ?, ?)");
@@ -33,7 +39,6 @@ try {
     
     $id = $db->lastInsertId();
     
-    // Obtener el producto recién creado con su categoría
     $stmt = $db->prepare("SELECT p.*, c.nombre as categoria_nombre 
                           FROM productos p 
                           LEFT JOIN categorias c ON p.categoria_id = c.id 
@@ -41,8 +46,10 @@ try {
     $stmt->execute([$id]);
     $producto = $stmt->fetch();
     
+    // Agregar etiqueta de unidad formateada para mostrarla en el modal
+    $producto['unidad_label'] = getUnidadLabel($producto['unidad_medida']);
+    
     echo json_encode(['success' => true, 'producto' => $producto]);
 } catch (PDOException $e) {
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
 }
-?>

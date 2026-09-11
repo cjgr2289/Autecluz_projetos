@@ -18,3 +18,4 @@ require_once __DIR__ . '/traducciones.php';
 require_once __DIR__ . '/estados.php';
 require_once __DIR__ . '/productos_helper.php';
 require_once __DIR__ . '/mailer/funciones_mail.php'; // CARGAR FUNCIONES DE EMAIL
+require_once __DIR__ . '/unidades.php';

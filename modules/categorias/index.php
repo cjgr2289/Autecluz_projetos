@@ -6,66 +6,132 @@ verificarSesion();
 
 $db = Database::getInstance()->getConnection();
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+// Permisos
+$puede_gestionar = tienePermiso(['directivo', 'gerenciador', 'compras']) || esMaster();
+
+// Crear categoría
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && $puede_gestionar) {
     $nombre = trim($_POST['nombre'] ?? '');
-    $descripcion = $_POST['descripcion'] ?? '';
+    $descripcion = trim($_POST['descripcion'] ?? '');
+    
     if ($nombre) {
-        $stmt = $db->prepare("INSERT INTO categorias (nombre, descripcion) VALUES (?, ?)");
-        $stmt->execute([$nombre, $descripcion]);
+        try {
+            $stmt = $db->prepare("INSERT INTO categorias (nombre, descripcion) VALUES (?, ?)");
+            $stmt->execute([$nombre, $descripcion]);
+            header('Location: index.php?mensaje=creado');
+            exit();
+        } catch (PDOException $e) {
+            $error = 'Error al crear: ' . $e->getMessage();
+        }
     }
 }
 
-$stmt = $db->query("SELECT c.*, (SELECT COUNT(*) FROM productos p WHERE p.categoria_id = c.id AND p.activo = 1) as total_productos 
-                    FROM categorias c WHERE c.activo = 1 ORDER BY c.nombre");
+// Listar
+$stmt = $db->query("SELECT c.*, 
+                    (SELECT COUNT(*) FROM productos p WHERE p.categoria_id = c.id AND p.activo = 1) as total_productos 
+                    FROM categorias c 
+                    WHERE c.activo = 1 
+                    ORDER BY c.nombre");
 $categorias = $stmt->fetchAll();
+
+$mensaje = $_GET['mensaje'] ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo $_SESSION['idioma'] ?? 'es'; ?>">
 <head>
     <meta charset="UTF-8">
-    <title>Categorías</title>
+    <title><?php echo traducir('Categorias'); ?></title>
     <link rel="stylesheet" href="../../assets/css/style.css">
+    <link rel="stylesheet" href="../../assets/css/tablas.css">
+    <link rel="stylesheet" href="../../assets/css/formularios.css">
+    <link rel="stylesheet" href="../../assets/css/badges.css">
+    <link rel="stylesheet" href="../../assets/css/mensajes.css">
+    <link rel="stylesheet" href="../../assets/css/footer.css">
 </head>
 <body>
     <?php include '../../includes/header.php'; ?>
     <div class="container">
         <div class="page-header">
-            <h1>Categorías</h1>
-            <a href="../productos/index.php" class="btn-secondary">Volver a Productos</a>
+            <h1><?php echo traducir('Categorias'); ?></h1>
+            <a href="../productos/index.php" class="btn-secondary">← <?php echo traducir('Productos'); ?></a>
         </div>
         
-        <div class="form-container">
-            <h3>Nueva Categoría</h3>
+        <?php if ($mensaje === 'creado'): ?>
+            <div class="success-message"><?php echo $_SESSION['idioma'] == 'pt' ? 'Categoria criada com sucesso!' : '¡Categoría creada exitosamente!'; ?></div>
+        <?php elseif ($mensaje === 'actualizado'): ?>
+            <div class="success-message"><?php echo $_SESSION['idioma'] == 'pt' ? 'Categoria atualizada com sucesso!' : '¡Categoría actualizada exitosamente!'; ?></div>
+        <?php elseif ($mensaje === 'eliminado'): ?>
+            <div class="success-message"><?php echo $_SESSION['idioma'] == 'pt' ? 'Categoria excluída com sucesso!' : '¡Categoría eliminada exitosamente!'; ?></div>
+        <?php elseif ($mensaje === 'en_uso'): ?>
+            <div class="error-message"><?php echo $_SESSION['idioma'] == 'pt' ? 'Não é possível excluir: categoria em uso.' : 'No se puede eliminar: categoría en uso.'; ?></div>
+        <?php elseif (isset($error)): ?>
+            <div class="error-message"><?php echo $error; ?></div>
+        <?php endif; ?>
+        
+        <?php if ($puede_gestionar): ?>
+        <div class="form-container" style="margin-bottom:1.5rem;">
+            <h3 style="margin-top:0;"><?php echo $_SESSION['idioma'] == 'pt' ? 'Nova Categoria' : 'Nueva Categoría'; ?></h3>
             <form method="POST">
                 <div class="form-row">
                     <div class="form-group">
-                        <input type="text" name="nombre" placeholder="Nombre" required>
+                        <label><?php echo traducir('Nombre'); ?> *</label>
+                        <input type="text" name="nombre" required>
                     </div>
                     <div class="form-group">
-                        <input type="text" name="descripcion" placeholder="Descripción">
+                        <label><?php echo traducir('Descripción'); ?></label>
+                        <input type="text" name="descripcion">
                     </div>
                 </div>
-                <button type="submit" class="btn-primary">Agregar</button>
+                <button type="submit" class="btn-primary">+ <?php echo traducir('Agregar'); ?></button>
             </form>
         </div>
+        <?php endif; ?>
         
         <div class="table-responsive">
             <table>
                 <thead>
                     <tr>
-                        <th>Nombre</th>
-                        <th>Descripción</th>
-                        <th>Productos</th>
+                        <th><?php echo traducir('Nombre'); ?></th>
+                        <th><?php echo traducir('Descripción'); ?></th>
+                        <th><?php echo traducir('Productos'); ?></th>
+                        <?php if ($puede_gestionar): ?>
+                            <th style="width:1%; text-align:center;"><?php echo traducir('Acciones'); ?></th>
+                        <?php endif; ?>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($categorias as $c): ?>
-                    <tr>
-                        <td><?php echo htmlspecialchars($c['nombre']); ?></td>
-                        <td><?php echo htmlspecialchars($c['descripcion'] ?? '-'); ?></td>
-                        <td><?php echo $c['total_productos']; ?></td>
-                    </tr>
-                    <?php endforeach; ?>
+                    <?php if (empty($categorias)): ?>
+                        <tr><td colspan="<?php echo $puede_gestionar ? 4 : 3; ?>" class="empty-cell">
+                            <?php echo $_SESSION['idioma'] == 'pt' ? 'Nenhuma categoria cadastrada' : 'No hay categorías registradas'; ?>
+                        </td></tr>
+                    <?php else: ?>
+                        <?php foreach ($categorias as $c): ?>
+                        <tr>
+                            <td><strong><?php echo htmlspecialchars($c['nombre']); ?></strong></td>
+                            <td><?php echo htmlspecialchars($c['descripcion'] ?? '-'); ?></td>
+                            <td>
+                                <span class="cat-badge"><?php echo $c['total_productos']; ?></span>
+                            </td>
+                            <?php if ($puede_gestionar): ?>
+                            <td class="col-acciones">
+                                <a href="editar.php?id=<?php echo $c['id']; ?>" 
+                                   class="btn-icon" 
+                                   title="<?php echo traducir('Editar'); ?>">✎</a>
+                                <?php if ($c['total_productos'] == 0): ?>
+                                    <a href="eliminar.php?id=<?php echo $c['id']; ?>" 
+                                       class="btn-icon btn-icon-danger"
+                                       onclick="return confirm('<?php echo traducir('¿Está seguro?'); ?>')"
+                                       title="<?php echo traducir('Eliminar'); ?>">🗑</a>
+                                <?php else: ?>
+                                    <span class="btn-icon" 
+                                          style="opacity:0.4; cursor:not-allowed;"
+                                          title="<?php echo $_SESSION['idioma'] == 'pt' ? 'Em uso - não pode excluir' : 'En uso - no se puede eliminar'; ?>">🔒</span>
+                                <?php endif; ?>
+                            </td>
+                            <?php endif; ?>
+                        </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>

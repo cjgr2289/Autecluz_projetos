@@ -403,7 +403,12 @@ foreach ($items as $it) {
                         <div class="form-row">
                             <div class="form-group">
                                 <label><?php echo traducir('Unidad de medida'); ?></label>
-                                <input type="text" id="nuevo-prod-unidad">
+                                <select id="nuevo-prod-unidad">
+                                    <option value="">-- <?php echo traducir('Seleccionar'); ?> --</option>
+                                    <?php foreach (getUnidadesMedida() as $cod => $lbl): ?>
+                                        <option value="<?php echo htmlspecialchars($cod); ?>"><?php echo htmlspecialchars($lbl); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
                             </div>
                             <div class="form-group">
                                 <label><?php echo traducir('Código'); ?></label>
@@ -438,9 +443,14 @@ foreach ($items as $it) {
                             <input type="number" id="item-cantidad" value="1" min="1" required>
                         </div>
                         <div class="form-group">
-                            <label><?php echo traducir('Unidad de medida'); ?></label>
-                            <input type="text" id="item-unidad">
-                        </div>
+    <label><?php echo traducir('Unidad de medida'); ?></label>
+    <select id="item-unidad">
+        <option value="">-- <?php echo traducir('Seleccionar'); ?> --</option>
+        <?php foreach (getUnidadesMedida() as $cod => $lbl): ?>
+            <option value="<?php echo htmlspecialchars($cod); ?>"><?php echo htmlspecialchars($lbl); ?></option>
+        <?php endforeach; ?>
+    </select>
+</div>
                         <div class="form-group">
                             <label><?php echo traducir('Fecha Requerida'); ?> *</label>
                             <input type="date" id="item-fecha" required>

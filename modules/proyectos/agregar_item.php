@@ -6,7 +6,7 @@ verificarSesion();
 
 header('Content-Type: application/json');
 
-if (!tienePermiso(['compras', 'directivo', 'gerenciador', 'supervisor', 'proyectista'])) {
+if (!tienePermiso(['compras', 'directivo', 'gerenciador', 'supervisor', 'proyectista']) && !esMaster()) {
     echo json_encode(['success' => false, 'error' => 'Sin permisos']);
     exit();
 }
@@ -21,8 +21,15 @@ $unidad_medida = $_POST['unidad_medida'] ?? '';
 $fecha_requerida = $_POST['fecha_requerida'] ?? '';
 $especificaciones = $_POST['especificaciones'] ?? '';
 
+// Validaciones
 if (!$proyecto_id || empty($nombre_item) || !$fecha_requerida || $cantidad < 1) {
     echo json_encode(['success' => false, 'error' => 'Datos incompletos']);
+    exit();
+}
+
+// Validar unidad de medida
+if (!empty($unidad_medida) && !esUnidadValida($unidad_medida)) {
+    echo json_encode(['success' => false, 'error' => 'Unidad de medida no válida']);
     exit();
 }
 
@@ -59,7 +66,7 @@ try {
 
     $item_id = $db->lastInsertId();
 
-    // Guardar historial
+    // Historial
     $stmt = $db->prepare("INSERT INTO historial_items 
                           (item_id, estado_anterior, estado_nuevo, fecha_anterior, fecha_nueva, 
                            cantidad_anterior, cantidad_nueva, usuario_id, comentario)
@@ -73,9 +80,7 @@ try {
         'Item creado'
     ]);
     
-    // ============================================
-    // ENVIAR NOTIFICACIÓN POR EMAIL A COMPRAS
-    // ============================================
+    // Notificación por email
     try {
         notificarItemsAgregados($db, $proyecto_id, [[
             'nombre_item'      => $nombre_item,
@@ -85,7 +90,6 @@ try {
             'especificaciones' => $especificaciones
         ]]);
     } catch (Exception $e) {
-        // Silencioso: no detenemos la respuesta si falla el email
         error_log("Error al enviar email de items agregados: " . $e->getMessage());
     }
     

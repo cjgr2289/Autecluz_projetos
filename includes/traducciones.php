@@ -55,6 +55,12 @@ function traducir($texto) {
                 'No hay productos registrados' => 'No hay productos registrados',
                 'Sin categoría' => 'Sin categoría',
                 'y seleccionar' => 'y seleccionar',
+                // ===== Categorías =====
+                'Nueva Categoría' => 'Nueva Categoría',
+                'Editar Categoría' => 'Editar Categoría',
+                'Categoría en uso' => 'Categoría en uso',
+                'No se puede eliminar' => 'No se puede eliminar',
+                'productos' => 'productos',
                 
                 // ===== Login =====
                 'Iniciar Sesión' => 'Iniciar Sesión',
@@ -203,7 +209,12 @@ function traducir($texto) {
                 'No hay productos registrados' => 'Não há produtos cadastrados',
                 'Sin categoría' => 'Sem categoria',
                 'y seleccionar' => 'e selecionar',
-                
+                'Nueva Categoría' => 'Nova Categoria',
+                'Editar Categoría' => 'Editar Categoria',
+                'Categoría en uso' => 'Categoria em uso',
+                'No se puede eliminar' => 'Não é possível excluir',
+                'productos' => 'produtos',
+                                
                 // ===== Login =====
                 'Iniciar Sesión' => 'Entrar',
                 'Usuario' => 'Usuário',
