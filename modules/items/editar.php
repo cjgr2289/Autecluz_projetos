@@ -25,6 +25,15 @@ if (!$item) {
     exit();
 }
 
+// Guardar snapshot de los datos ANTES
+$datos_anteriores = [
+    'nombre_item'      => $item['nombre_item'],
+    'cantidad'         => $item['cantidad'],
+    'unidad_medida'    => $item['unidad_medida'],
+    'fecha_requerida'  => $item['fecha_requerida'],
+    'especificaciones' => $item['especificaciones'],
+];
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $nombre = trim($_POST['nombre_item'] ?? '');
     $cantidad = intval($_POST['cantidad'] ?? 1);
@@ -32,17 +41,51 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $fecha = $_POST['fecha_requerida'] ?? '';
     $especificaciones = $_POST['especificaciones'] ?? '';
     
-    // Validar unidad
     if (!empty($unidad) && !esUnidadValida($unidad)) {
         $error = 'Unidad de medida no válida';
     } elseif (empty($nombre) || $cantidad < 1 || empty($fecha)) {
         $error = 'Nombre, cantidad y fecha son obligatorios';
     } else {
+        $datos_nuevos = [
+            'nombre_item'      => $nombre,
+            'cantidad'         => $cantidad,
+            'unidad_medida'    => $unidad,
+            'fecha_requerida'  => $fecha,
+            'especificaciones' => $especificaciones,
+        ];
+        
         $stmt = $db->prepare("UPDATE items_proyecto 
                               SET nombre_item=?, cantidad=?, unidad_medida=?, 
                                   fecha_requerida=?, especificaciones=? 
                               WHERE id=?");
         $stmt->execute([$nombre, $cantidad, $unidad, $fecha, $especificaciones, $id]);
+        
+        // Guardar en historial si cambió algo
+        $cambios = [];
+        foreach (['nombre_item', 'cantidad', 'unidad_medida', 'fecha_requerida', 'especificaciones'] as $campo) {
+            $ant = (string)($datos_anteriores[$campo] ?? '');
+            $nue = (string)($datos_nuevos[$campo] ?? '');
+            if ($campo === 'cantidad') {
+                $ant = (int)$ant; $nue = (int)$nue;
+                if ($ant !== $nue) $cambios[] = "$campo: $ant -> $nue";
+            } elseif ($ant !== $nue) {
+                $cambios[] = "$campo: '$ant' -> '$nue'";
+            }
+        }
+        
+        if (!empty($cambios)) {
+            $stmt = $db->prepare("INSERT INTO historial_items 
+                                  (item_id, estado_anterior, estado_nuevo, usuario_id, comentario)
+                                  VALUES (?, NULL, NULL, ?, ?)");
+            $stmt->execute([$id, $_SESSION['usuario_id'], 'Item editado: ' . implode(' | ', $cambios)]);
+            
+            // Enviar notificación por email
+            try {
+                notificarItemEditado($db, $id, $datos_anteriores, $datos_nuevos, $_SESSION['usuario_id']);
+            } catch (Exception $e) {
+                error_log("Error al enviar email de item editado: " . $e->getMessage());
+            }
+        }
         
         header('Location: ../proyectos/ver.php?id=' . $proyecto_id . '&mensaje=actualizado');
         exit();
@@ -75,14 +118,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <form method="POST">
                 <div class="form-group">
                     <label><?php echo traducir('Nombre'); ?> *</label>
-                    <input type="text" name="nombre_item" 
-                           value="<?php echo htmlspecialchars($item['nombre_item']); ?>" required>
+                    <input type="text" name="nombre_item" value="<?php echo htmlspecialchars($item['nombre_item']); ?>" required>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label><?php echo traducir('Cantidad'); ?> *</label>
-                        <input type="number" name="cantidad" 
-                               value="<?php echo $item['cantidad']; ?>" min="1" required>
+                        <input type="number" name="cantidad" value="<?php echo $item['cantidad']; ?>" min="1" required>
                     </div>
                     <div class="form-group">
                         <label><?php echo traducir('Unidad'); ?></label>
@@ -91,14 +132,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 </div>
                 <div class="form-group">
                     <label><?php echo traducir('Fecha Requerida'); ?> *</label>
-                    <input type="date" name="fecha_requerida" 
-                           value="<?php echo $item['fecha_requerida']; ?>" required>
+                    <input type="date" name="fecha_requerida" value="<?php echo $item['fecha_requerida']; ?>" required>
                 </div>
                 <div class="form-group">
                     <label><?php echo traducir('Especificaciones / Notas'); ?></label>
                     <textarea name="especificaciones" rows="3"><?php echo htmlspecialchars($item['especificaciones'] ?? ''); ?></textarea>
                 </div>
-                <button type="submit" class="btn-primary"><?php echo traducir('Actualizar'); ?></button>
+                <div style="display:flex; gap:0.75rem;">
+                    <button type="submit" class="btn-primary"><?php echo traducir('Actualizar'); ?></button>
+                    <a href="../proyectos/ver.php?id=<?php echo $proyecto_id; ?>" class="btn-secondary"><?php echo traducir('Cancelar'); ?></a>
+                </div>
             </form>
         </div>
     </div>

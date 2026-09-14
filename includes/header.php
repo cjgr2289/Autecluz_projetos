@@ -20,8 +20,11 @@ $idioma_actual = $_SESSION['idioma'] ?? 'es';
     <link rel="stylesheet" href="/sistema_proyectos/assets/css/items.css">
     <link rel="stylesheet" href="/sistema_proyectos/assets/css/modal.css">
     <link rel="stylesheet" href="/sistema_proyectos/assets/css/productos.css">
+    <link rel="stylesheet" href="/sistema_proyectos/assets/css/reportes.css">
     <link rel="stylesheet" href="/sistema_proyectos/assets/css/usuarios.css">
+    <link rel="stylesheet" href="/sistema_proyectos/assets/css/notificaciones.css">
     <link rel="stylesheet" href="/sistema_proyectos/assets/css/footer.css">
+    <link rel="stylesheet" href="/sistema_proyectos/assets/css/ui.css">
 </head>
 <body>
     <header>
@@ -40,6 +43,12 @@ $idioma_actual = $_SESSION['idioma'] ?? 'es';
                 <?php endif; ?>
                 
                 <li><a href="/sistema_proyectos/modules/login/logout.php"><?php echo traducir('Cerrar Sesión'); ?></a></li>
+                <li class="nav-notificaciones">
+                    <button type="button" id="btn-notificaciones" class="btn-notificaciones" onclick="toggleNotificaciones(event)">
+                        <span class="icono-campana">🔔</span>
+                        <span class="badge-notificaciones" id="badge-notificaciones" style="display:none;">0</span>
+                    </button>
+                </li>
                 <li>
                     <select id="cambiar_idioma" class="idioma-select">
                         <option value="es" <?php echo $idioma_actual == 'es' ? 'selected' : ''; ?>>Español</option>
@@ -48,5 +57,28 @@ $idioma_actual = $_SESSION['idioma'] ?? 'es';
                 </li>
             </ul>
         </nav>
+        <!-- ============================================
+     PANEL DE NOTIFICACIONES
+     ============================================ -->
+<div id="panel-notificaciones" class="panel-notificaciones" style="display:none;">
+    <div class="panel-header">
+        <h3>🔔 <?php echo traducir('Notificaciones'); ?></h3>
+        <button type="button" class="btn-marcar-todas" onclick="marcarTodasLeidas()" title="<?php echo traducir('Marcar todas como leídas'); ?>">
+            ✓ <?php echo traducir('Marcar todas'); ?>
+        </button>
+    </div>
+    <div class="panel-body" id="panel-notificaciones-body">
+        <div class="panel-loading">
+            <span class="spinner"></span>
+            <?php echo traducir('Cargando'); ?>...
+        </div>
+    </div>
+    <div class="panel-footer">
+        <a href="/sistema_proyectos/modules/proyectos/index.php">
+            <?php echo traducir('Ver todos los proyectos'); ?> →
+        </a>
+    </div>
+</div>
     </header>
+    <script src="/sistema_proyectos/assets/js/ui.js"></script>
     <main>

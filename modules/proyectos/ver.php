@@ -106,6 +106,36 @@ foreach ($items as $it) {
                             + <?php echo traducir('Agregar Item'); ?>
                         </button>
                     <?php endif; ?>
+
+                    <!-- ===== NUEVOS BOTONES DE REPORTES ===== -->
+    <div class="dropdown-reportes">
+        <button type="button" class="btn-secondary btn-sm" onclick="toggleDropdownReportes(event)">
+            📊 <?php echo $_SESSION['idioma'] == 'pt' ? 'Relatórios' : 'Reportes'; ?> ▾
+        </button>
+        <div class="dropdown-menu" id="dropdown-reportes" style="display:none;">
+            <a href="reporte.php?id=<?php echo $proyecto_id; ?>">
+                📋 <?php echo $_SESSION['idioma'] == 'pt' ? 'Itens por Status' : 'Items por Estado'; ?>
+            </a>
+            <a href="reporte_entrega.php?id=<?php echo $proyecto_id; ?>">
+                📦 <?php echo $_SESSION['idioma'] == 'pt' ? 'Entrega de Materiais' : 'Entrega de Materiales'; ?>
+            </a>
+            <a href="reporte_costos.php?id=<?php echo $proyecto_id; ?>">
+                💰 <?php echo $_SESSION['idioma'] == 'pt' ? 'Custos' : 'Costos'; ?>
+            </a>
+            <?php if (tienePermiso(['compras', 'directivo', 'gerenciador']) || esMaster()): ?>
+                <a href="editar_costos.php?id=<?php echo $proyecto_id; ?>">
+                    ✎ <?php echo $_SESSION['idioma'] == 'pt' ? 'Editar Custos' : 'Editar Costos'; ?>
+                </a>
+            <?php endif; ?>
+        </div>
+    </div>
+    
+    <?php if ($puede_agregar_items): ?>
+        <button type="button" class="btn-primary btn-sm" onclick="abrirModalProducto()">
+            + <?php echo traducir('Agregar Item'); ?>
+        </button>
+    <?php endif; ?>
+                    
                 </div>
             </div>
             
@@ -239,18 +269,30 @@ foreach ($items as $it) {
                                         </span>
                                     </td>
                                     <td class="col-item-acciones">
-                                        <?php if ($puede_cambiar_estado_item): ?>
-                                            <a href="../items/actualizar_estado.php?id=<?php echo $item['id']; ?>&proyecto=<?php echo $proyecto_id; ?>" 
-                                               class="btn-icon" title="<?php echo traducir('Estado'); ?>">🔄</a>
-                                        <?php endif; ?>
-                                        <a href="../items/editar.php?id=<?php echo $item['id']; ?>&proyecto=<?php echo $proyecto_id; ?>" 
-                                           class="btn-icon" title="<?php echo traducir('Editar'); ?>">✎</a>
-                                        <?php if (tienePermiso(['directivo', 'gerenciador', 'compras'])): ?>
-                                            <a href="../items/eliminar.php?id=<?php echo $item['id']; ?>&proyecto=<?php echo $proyecto_id; ?>" 
-                                               class="btn-icon btn-icon-danger"
-                                               onclick="return confirm('<?php echo traducir('¿Eliminar este item?'); ?>')"
-                                               title="<?php echo traducir('Eliminar'); ?>">🗑</a>
-                                        <?php endif; ?>
+                                        <div class="acciones-grupo">
+                                            <?php if ($puede_cambiar_estado_item): ?>
+                                                <a href="../items/actualizar_estado.php?id=<?php echo $item['id']; ?>&proyecto=<?php echo $proyecto_id; ?>" 
+                                                class="btn-accion btn-accion-estado" 
+                                                data-tooltip="<?php echo traducir('Estado'); ?>">
+                                                    <?php echo icono('estado'); ?>
+                                                </a>
+                                            <?php endif; ?>
+                                            
+                                            <a href="../items/editar.php?id=<?php echo $item['id']; ?>&proyecto=<?php echo $proyecto_id; ?>" 
+                                            class="btn-accion btn-accion-editar" 
+                                            data-tooltip="<?php echo traducir('Editar'); ?>">
+                                                <?php echo icono('editar'); ?>
+                                            </a>
+                                            
+                                            <?php if (tienePermiso(['directivo', 'gerenciador', 'compras'])): ?>
+                                                <button type="button" 
+                                                        class="btn-accion btn-accion-eliminar" 
+                                                        data-tooltip="<?php echo traducir('Eliminar'); ?>"
+                                                        onclick="confirmarEliminarItem(<?php echo $item['id']; ?>, '<?php echo htmlspecialchars(addslashes($item['nombre_item'])); ?>')">
+                                                    <?php echo icono('eliminar'); ?>
+                                                </button>
+                                            <?php endif; ?>
+                                        </div>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -528,6 +570,41 @@ foreach ($items as $it) {
         document.querySelector(`.tab-btn[data-tab="${tabName}"]`).classList.add('active');
         document.getElementById('tab-' + tabName).classList.add('active');
     }
+
+    function toggleDropdownReportes(e) {
+    e.stopPropagation();
+    const menu = document.getElementById('dropdown-reportes');
+    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+// Cerrar dropdown al hacer click fuera
+document.addEventListener('click', function(e) {
+    const dropdown = document.getElementById('dropdown-reportes');
+    if (dropdown && !e.target.closest('.dropdown-reportes')) {
+        dropdown.style.display = 'none';
+    }
+});
+
+
+async function confirmarEliminarItem(itemId, nombre) {
+    const idioma = '<?php echo $_SESSION['idioma']; ?>';
+    
+    const mensaje = idioma === 'pt'
+        ? `Deseja excluir o item "${nombre}" deste projeto?`
+        : `¿Desea eliminar el item "${nombre}" de este proyecto?`;
+    
+    const ok = await Confirm.show({
+        titulo: idioma === 'pt' ? 'Excluir Item' : 'Eliminar Item',
+        mensaje: mensaje,
+        textoConfirmar: idioma === 'pt' ? 'Excluir' : 'Eliminar',
+        tipo: 'danger'
+    });
+    
+    if (ok) {
+        window.location.href = '../items/eliminar.php?id=' + itemId + '&proyecto=<?php echo $proyecto_id; ?>';
+    }
+}
+
     </script>
     <script src="../../assets/js/modal_productos.js"></script>
     

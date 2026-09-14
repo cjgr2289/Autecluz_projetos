@@ -455,3 +455,124 @@
         justify-content: center;
     }
 }
+
+/* Dropdown de reportes */
+.dropdown-reportes {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-reportes .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    min-width: 220px;
+    z-index: 100;
+    padding: 0.35rem 0;
+    margin-top: 0.25rem;
+    border: 1px solid #e9ecef;
+}
+
+.dropdown-reportes .dropdown-menu a {
+    display: block;
+    padding: 0.6rem 1rem;
+    color: #333;
+    text-decoration: none;
+    font-size: 0.88rem;
+    transition: background 0.15s;
+    white-space: nowrap;
+}
+
+.dropdown-reportes .dropdown-menu a:hover {
+    background: #f8f9fa;
+    color: var(--secondary-color);
+}
+
+/* Link del proyecto en el dashboard */
+.proyecto-link {
+    text-decoration: none;
+    color: inherit;
+    display: inline-block;
+    transition: color 0.15s;
+}
+
+.proyecto-link:hover .proyecto-nombre {
+    color: var(--secondary-color);
+    text-decoration: underline;
+}
+
+/* ============================================
+   GRUPOS COLAPSABLES DE PROYECTOS
+   ============================================ */
+.proyectos-grupo {
+    margin-bottom: 1.5rem;
+}
+
+.grupo-header {
+    cursor: pointer;
+    user-select: none;
+    padding: 0.85rem 1.25rem;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    transition: background 0.15s;
+    border-left: 4px solid var(--secondary-color);
+}
+
+.grupo-header:hover {
+    background: #f8f9fa;
+}
+
+.grupo-titulo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.grupo-toggle {
+    font-size: 0.75rem;
+    color: #7f8c8d;
+    width: 14px;
+    display: inline-block;
+    text-align: center;
+    transition: transform 0.15s;
+}
+
+.grupo-titulo h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.grupo-badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.2rem 0.6rem;
+    border-radius: 10px;
+    margin-left: auto;
+}
+
+.grupo-badge.activos {
+    background: #cce5ff;
+    color: #004085;
+}
+
+.grupo-badge.finalizados {
+    background: #e9ecef;
+    color: #495057;
+}
+
+.grupo-contenido {
+    margin-top: 0.75rem;
+    animation: fadeIn 0.2s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}

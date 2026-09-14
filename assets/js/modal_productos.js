@@ -125,7 +125,7 @@ function crearProductoRapido() {
     const descripcion = document.getElementById('nuevo-prod-descripcion').value.trim();
     
     if (!nombre) {
-        alert('El nombre del producto es obligatorio');
+        Toast.warning('El nombre del producto es obligatorio');
         return;
     }
     
@@ -159,7 +159,7 @@ function crearProductoRapido() {
             buscarProductos();
             document.getElementById('item-cantidad').focus();
         } else {
-            alert('Error: ' + (data.error || 'No se pudo crear el producto'));
+            Toast.error('Error: ' + (data.error || 'No se pudo crear el producto'));
         }
     });
 }
@@ -174,15 +174,15 @@ function agregarItem() {
     const especificaciones = document.getElementById('item-especificaciones').value.trim();
     
     if (!nombre) {
-        alert('Debe seleccionar o escribir un producto');
+        Toast.warning('Debe seleccionar o escribir un producto');
         return;
     }
     if (cantidad < 1) {
-        alert('La cantidad debe ser al menos 1');
+        Toast.warning('La cantidad debe ser al menos 1');
         return;
     }
     if (!fecha) {
-        alert('Debe indicar la fecha requerida');
+        Toast.warning('Debe indicar la fecha requerida');
         return;
     }
     
@@ -258,62 +258,54 @@ function eliminarPendiente(idx) {
 // ============ GUARDAR TODOS LOS ITEMS ============
 function guardarTodos() {
     if (itemsPendientes.length === 0) {
-        alert('No hay items para guardar. Agregue al menos uno.');
+        Toast.warning(t('sinItemsGuardar'));
         return;
     }
     
     const btn = event.target;
     btn.disabled = true;
-    btn.textContent = 'Guardando...';
+    btn.textContent = t('guardando');
     
-    let guardados = 0;
-    let errores = [];
+    // Enviar todos los items en UNA sola petición
+    const payload = {
+        proyecto_id: PROYECTO_ID,
+        items: itemsPendientes
+    };
     
-    const promesas = itemsPendientes.map(item => {
-        const fd = new FormData();
-        fd.append('proyecto_id', PROYECTO_ID);
-        fd.append('producto_id', item.producto_id || '');
-        fd.append('nombre_item', item.nombre_item);
-        fd.append('cantidad', item.cantidad);
-        fd.append('unidad_medida', item.unidad_medida);
-        fd.append('fecha_requerida', item.fecha_requerida);
-        fd.append('especificaciones', item.especificaciones);
-        
-        return fetch(BASE_URL + 'modules/proyectos/agregar_item.php', {
-            method: 'POST',
-            body: fd
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                guardados++;
-                // Agregar a la tabla principal sin recargar
-                agregarFilaTabla(item, data.item_id);
-            } else {
-                errores.push(item.nombre_item + ': ' + (data.error || 'Error'));
-            }
-        })
-        .catch(e => errores.push(item.nombre_item + ': ' + e.message));
-    });
-    
-    Promise.all(promesas).then(() => {
+    fetch(BASE_URL + 'modules/proyectos/agregar_items_lote.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(data => {
         btn.disabled = false;
-        btn.textContent = 'Guardar todos los items';
+        btn.textContent = t('guardarTodos');
         
-        if (errores.length > 0) {
-            alert('Algunos items no se pudieron guardar:\n' + errores.join('\n'));
-        }
-        
-        if (guardados > 0) {
+        if (data.success) {
+            // Mostrar errores si hay alguno
+            if (data.errores && data.errores.length > 0) {
+                Toast.error(t('errorGuardar') + '\n' + data.errores.join('\n'));
+            }
+            
+            // Limpiar items pendientes
             itemsPendientes = [];
             renderizarItemsPendientes();
-            // Quitar el mensaje "sin items"
-            const sinItems = document.getElementById('sin-items');
-            if (sinItems) sinItems.remove();
             
             // Cerrar modal
             document.getElementById('modal-producto').style.display = 'none';
+            
+            // ✅ SOLUCIÓN: Recargar la página para mostrar los items actualizados
+            // Esto evita errores de DOM y siempre muestra los datos reales
+            window.location.reload();
+        } else {
+            Toast.error(t('errorGuardar') + ' ' + (data.error || ''));
         }
+    })
+    .catch(e => {
+        btn.disabled = false;
+        btn.textContent = t('guardarTodos');
+        Toast.error('Error: ' + e.message);
     });
 }
 
