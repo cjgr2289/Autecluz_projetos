@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $tipo_usuario = $_POST['tipo_usuario'] ?? '';
     $idioma = $_POST['idioma_preferido'] ?? 'es';
     
-    $tipos_validos = ['directivo', 'gerenciador', 'supervisor', 'compras', 'proyectista'];
+    $tipos_validos = ['directivo', 'gerenciador', 'supervisor', 'compras', 'proyectista', 'almacen'];
     
     if (empty($username) || empty($password) || empty($nombre_completo) || !in_array($tipo_usuario, $tipos_validos)) {
         $error = 'Todos los campos son obligatorios';
@@ -23,8 +23,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $db = Database::getInstance()->getConnection();
         try {
             $stmt = $db->prepare("INSERT INTO usuarios 
-                                  (username, password, nombre_completo, email, tipo_usuario, idioma_preferido)
-                                  VALUES (?, ?, ?, ?, ?, ?)");
+                                (username, password, nombre_completo, email, tipo_usuario, idioma_preferido, debe_cambiar_password)
+                                VALUES (?, ?, ?, ?, ?, ?, TRUE)"); 
             $stmt->execute([
                 $username,
                 password_hash($password, PASSWORD_DEFAULT),
@@ -106,6 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <option value="supervisor"><?php echo traducir('Supervisor'); ?></option>
                             <option value="compras"><?php echo traducir('Compras'); ?></option>
                             <option value="proyectista"><?php echo traducir('Proyectista'); ?></option>
+                            <option value="almacen"><?php echo traducir('Almacen'); ?></option>  <!-- ← NUEVO -->
                         </select>
                     </div>
                     <div class="form-group">

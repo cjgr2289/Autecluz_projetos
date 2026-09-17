@@ -217,6 +217,51 @@ window.alert = function(mensaje) {
     console.log('[alert→toast]', tipo, mensaje);
 };
 
+// ============================================
+// MENÚ DE USUARIO
+// ============================================
+function toggleUserMenu(e) {
+    if (e) e.stopPropagation();
+    
+    const menu = document.getElementById('user-dropdown');
+    const navMenu = document.querySelector('.nav-user-menu');
+    if (!menu) return;
+    
+    const abierto = menu.style.display !== 'none';
+    
+    if (abierto) {
+        menu.style.display = 'none';
+        if (navMenu) navMenu.classList.remove('abierto');
+    } else {
+        menu.style.display = 'block';
+        if (navMenu) navMenu.classList.add('abierto');
+    }
+}
+
+// Cerrar al hacer click fuera
+document.addEventListener('click', function(e) {
+    const menu = document.getElementById('user-dropdown');
+    const navMenu = document.querySelector('.nav-user-menu');
+    if (!menu || menu.style.display === 'none') return;
+    
+    if (!e.target.closest('.nav-user-menu')) {
+        menu.style.display = 'none';
+        if (navMenu) navMenu.classList.remove('abierto');
+    }
+});
+
+// Cerrar con ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const menu = document.getElementById('user-dropdown');
+        const navMenu = document.querySelector('.nav-user-menu');
+        if (menu && menu.style.display !== 'none') {
+            menu.style.display = 'none';
+            if (navMenu) navMenu.classList.remove('abierto');
+        }
+    }
+});
+
 /**
  * Guarda el confirm() original para uso interno y lo reemplaza
  * por una versión que usa el modal.

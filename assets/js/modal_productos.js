@@ -1,7 +1,10 @@
 // assets/js/modal_productos.js
-// Sistema de modal para agregar productos a un proyecto sin perder los ya agregados
+// Sistema de modal para agregar productos a un proyecto
 
-let itemsPendientes = []; // Items que se van a guardar al final
+// Usar la URL base global definida en header.php
+const MODAL_BASE_URL = window.BASE_URL || '/';
+
+let itemsPendientes = [];
 let productosCache = [];
 let debounceTimer = null;
 
@@ -12,11 +15,20 @@ function abrirModalProducto() {
     buscarProductos();
 }
 
-function cerrarModalProducto() {
+async function cerrarModalProducto() {
     if (itemsPendientes.length > 0) {
-        if (!confirm('Hay items pendientes sin guardar. ¿Desea cerrar de todas formas? Se perderán.')) {
-            return;
-        }
+        const idioma = document.documentElement.lang || 'es';
+        const ok = await Confirm.show({
+            titulo: idioma === 'pt' ? 'Itens pendentes' : 'Items pendientes',
+            mensaje: idioma === 'pt'
+                ? 'Há itens pendentes sem salvar. Deseja fechar mesmo assim? Eles serão perdidos.'
+                : 'Hay items pendientes sin guardar. ¿Desea cerrar de todas formas? Se perderán.',
+            textoConfirmar: idioma === 'pt' ? 'Fechar' : 'Cerrar',
+            textoCancelar: idioma === 'pt' ? 'Cancelar' : 'Cancelar',
+            tipo: 'warning'
+        });
+        
+        if (!ok) return;
     }
     document.getElementById('modal-producto').style.display = 'none';
     itemsPendientes = [];
@@ -26,7 +38,7 @@ function cerrarModalProducto() {
 
 // ============ CATEGORÍAS ============
 function cargarCategorias() {
-    fetch(BASE_URL + 'modules/productos/categorias_ajax.php')
+    fetch(MODAL_BASE_URL + 'modules/productos/categorias_ajax.php')
         .then(r => r.json())
         .then(data => {
             if (!data.success) return;
@@ -36,7 +48,6 @@ function cargarCategorias() {
             ];
             selects.forEach(sel => {
                 if (!sel) return;
-                // Conservar opción inicial
                 const firstOption = sel.options[0];
                 sel.innerHTML = '';
                 sel.appendChild(firstOption);
@@ -64,7 +75,7 @@ function buscarProductos() {
     if (q) params.append('q', q);
     if (cat) params.append('categoria', cat);
     
-    fetch(BASE_URL + 'modules/productos/buscar_ajax.php?' + params.toString())
+    fetch(MODAL_BASE_URL + 'modules/productos/buscar_ajax.php?' + params.toString())
         .then(r => r.json())
         .then(data => {
             if (!data.success) return;
@@ -76,11 +87,17 @@ function buscarProductos() {
 function renderizarProductos(productos) {
     const cont = document.getElementById('productos-lista');
     if (!productos || productos.length === 0) {
-        cont.innerHTML = '<p class="empty-msg">No se encontraron productos</p>';
+        cont.innerHTML = '<p class="empty-msg">' + t('noProductos') + '</p>';
         return;
     }
     
-    let html = '<table class="tabla-productos"><thead><tr><th>Nombre</th><th>Categoría</th><th>Unidad</th><th></th></tr></thead><tbody>';
+    let html = '<table class="tabla-productos"><thead><tr>' +
+        '<th>' + (t('nombre') || 'Nombre') + '</th>' +
+        '<th>' + (t('categoria') || 'Categoría') + '</th>' +
+        '<th>' + (t('unidad') || 'Unidad') + '</th>' +
+        '<th></th>' +
+        '</tr></thead><tbody>';
+    
     productos.forEach(p => {
         html += `<tr>
             <td>${escapeHtml(p.nombre)}</td>
@@ -89,7 +106,7 @@ function renderizarProductos(productos) {
             <td>
                 <button type="button" class="btn-small btn-primary"
                     onclick='seleccionarProducto(${JSON.stringify(p).replace(/'/g, "&#39;")})'>
-                    Seleccionar
+                    ${t('seleccionar') || 'Seleccionar'}
                 </button>
             </td>
         </tr>`;
@@ -102,7 +119,6 @@ function seleccionarProducto(producto) {
     document.getElementById('item-producto-id').value = producto.id;
     document.getElementById('item-nombre').value = producto.nombre;
     
-    // Ahora es un select, se asigna directo con value
     const unidadSelect = document.getElementById('item-unidad');
     if (unidadSelect) {
         unidadSelect.value = producto.unidad_medida || '';
@@ -120,12 +136,12 @@ function toggleNuevoProducto() {
 function crearProductoRapido() {
     const nombre = document.getElementById('nuevo-prod-nombre').value.trim();
     const categoria_id = document.getElementById('nuevo-prod-categoria').value;
-    const unidad_medida = document.getElementById('nuevo-prod-unidad').value.trim();
+    const unidad_medida = document.getElementById('nuevo-prod-unidad').value;
     const codigo = document.getElementById('nuevo-prod-codigo').value.trim();
     const descripcion = document.getElementById('nuevo-prod-descripcion').value.trim();
     
     if (!nombre) {
-        Toast.warning('El nombre del producto es obligatorio');
+        Toast.warning(t('nombreObligatorio'));
         return;
     }
     
@@ -136,31 +152,41 @@ function crearProductoRapido() {
     formData.append('codigo', codigo);
     formData.append('descripcion', descripcion);
     
-    fetch(BASE_URL + 'modules/productos/crear_ajax.php', {
+    fetch(MODAL_BASE_URL + 'modules/productos/crear_ajax.php', {
         method: 'POST',
         body: formData
     })
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            // Autoseleccionar el producto creado
             document.getElementById('item-producto-id').value = data.producto.id;
             document.getElementById('item-nombre').value = data.producto.nombre;
-            document.getElementById('item-unidad').value = data.producto.unidad_medida || '';
             
-            // Limpiar form
+            const unidadSelect = document.getElementById('item-unidad');
+            if (unidadSelect) {
+                unidadSelect.value = data.producto.unidad_medida || '';
+            }
+            
             document.getElementById('nuevo-prod-nombre').value = '';
             document.getElementById('nuevo-prod-unidad').value = '';
             document.getElementById('nuevo-prod-codigo').value = '';
             document.getElementById('nuevo-prod-descripcion').value = '';
             document.getElementById('nuevo-producto-form').style.display = 'none';
             
-            // Refrescar la lista
+            Toast.success(
+                document.documentElement.lang === 'pt'
+                    ? 'Produto criado com sucesso!'
+                    : '¡Producto creado exitosamente!'
+            );
+            
             buscarProductos();
             document.getElementById('item-cantidad').focus();
         } else {
-            Toast.error('Error: ' + (data.error || 'No se pudo crear el producto'));
+            Toast.error((t('errorCrear') || 'Error') + ': ' + (data.error || ''));
         }
+    })
+    .catch(e => {
+        Toast.error('Error: ' + e.message);
     });
 }
 
@@ -169,35 +195,48 @@ function agregarItem() {
     const producto_id = document.getElementById('item-producto-id').value || null;
     const nombre = document.getElementById('item-nombre').value.trim();
     const cantidad = parseInt(document.getElementById('item-cantidad').value) || 0;
-    const unidad = document.getElementById('item-unidad').value.trim();
+    const unidad = document.getElementById('item-unidad').value;
     const fecha = document.getElementById('item-fecha').value;
     const especificaciones = document.getElementById('item-especificaciones').value.trim();
     
     if (!nombre) {
-        Toast.warning('Debe seleccionar o escribir un producto');
+        Toast.warning(t('errorNombre'));
         return;
     }
     if (cantidad < 1) {
-        Toast.warning('La cantidad debe ser al menos 1');
+        Toast.warning(t('errorCantidad'));
         return;
     }
     if (!fecha) {
-        Toast.warning('Debe indicar la fecha requerida');
+        Toast.warning(t('errorFecha'));
         return;
     }
     
-    // Verificar duplicado (mismo producto o nombre)
     const existe = itemsPendientes.find(i => 
         (producto_id && i.producto_id == producto_id) || 
         (!producto_id && i.nombre_item.toLowerCase() === nombre.toLowerCase())
     );
     
     if (existe) {
-        if (confirm('Este producto ya está en la lista. ¿Desea sumar la cantidad?')) {
-            existe.cantidad += cantidad;
-            renderizarItemsPendientes();
-            limpiarFormularioItem();
-        }
+        (async () => {
+            const ok = await Confirm.show({
+                titulo: 'Item duplicado',
+                mensaje: t('confirmarSumar'),
+                textoConfirmar: document.documentElement.lang === 'pt' ? 'Somar' : 'Sumar',
+                tipo: 'question'
+            });
+            
+            if (ok) {
+                existe.cantidad += cantidad;
+                renderizarItemsPendientes();
+                limpiarFormularioItem();
+                Toast.info(
+                    document.documentElement.lang === 'pt'
+                        ? 'Quantidade atualizada'
+                        : 'Cantidad actualizada'
+                );
+            }
+        })();
         return;
     }
     
@@ -212,6 +251,13 @@ function agregarItem() {
     
     renderizarItemsPendientes();
     limpiarFormularioItem();
+    
+    Toast.success(
+        document.documentElement.lang === 'pt'
+            ? 'Item adicionado à lista'
+            : 'Item agregado a la lista',
+        { duracion: 2000 }
+    );
 }
 
 function limpiarFormularioItem() {
@@ -228,12 +274,16 @@ function renderizarItemsPendientes() {
     document.getElementById('contador-items').textContent = itemsPendientes.length;
     
     if (itemsPendientes.length === 0) {
-        cont.innerHTML = '<p class="empty-msg">Aún no ha agregado items</p>';
+        cont.innerHTML = '<p class="empty-msg">' + t('noItems') + '</p>';
         return;
     }
     
     let html = '<table class="tabla-items-pendientes"><thead><tr>' +
-        '<th>Item</th><th>Cantidad</th><th>Unidad</th><th>Fecha</th><th></th>' +
+        '<th>' + (t('nombre') || 'Item') + '</th>' +
+        '<th>' + (t('cantidad') || 'Cantidad') + '</th>' +
+        '<th>' + (t('unidad') || 'Unidad') + '</th>' +
+        '<th>' + (t('fecha') || 'Fecha') + '</th>' +
+        '<th></th>' +
         '</tr></thead><tbody>';
     
     itemsPendientes.forEach((item, idx) => {
@@ -241,8 +291,12 @@ function renderizarItemsPendientes() {
             <td>${escapeHtml(item.nombre_item)}</td>
             <td>${item.cantidad}</td>
             <td>${escapeHtml(item.unidad_medida || '-')}</td>
-            <td>${item.fecha_requerida}</td>
-            <td><button type="button" class="btn-small btn-danger" onclick="eliminarPendiente(${idx})">X</button></td>
+            <td>${formatearFecha(item.fecha_requerida)}</td>
+            <td>
+                <button type="button" class="btn-icon btn-icon-danger" 
+                        onclick="eliminarPendiente(${idx})" 
+                        title="${document.documentElement.lang === 'pt' ? 'Remover' : 'Eliminar'}">×</button>
+            </td>
         </tr>`;
     });
     
@@ -263,16 +317,16 @@ function guardarTodos() {
     }
     
     const btn = event.target;
+    const textoOriginal = btn.textContent;
     btn.disabled = true;
     btn.textContent = t('guardando');
     
-    // Enviar todos los items en UNA sola petición
     const payload = {
         proyecto_id: PROYECTO_ID,
         items: itemsPendientes
     };
     
-    fetch(BASE_URL + 'modules/proyectos/agregar_items_lote.php', {
+    fetch(MODAL_BASE_URL + 'modules/proyectos/agregar_items_lote.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -280,51 +334,39 @@ function guardarTodos() {
     .then(r => r.json())
     .then(data => {
         btn.disabled = false;
-        btn.textContent = t('guardarTodos');
+        btn.textContent = textoOriginal;
         
         if (data.success) {
-            // Mostrar errores si hay alguno
+            const guardados = data.guardados || data.items?.length || 0;
+            
             if (data.errores && data.errores.length > 0) {
-                Toast.error(t('errorGuardar') + '\n' + data.errores.join('\n'));
+                Toast.warning(t('errorGuardar') + ' ' + data.errores.join(' • '), { duracion: 6000 });
             }
             
-            // Limpiar items pendientes
+            const msg = document.documentElement.lang === 'pt'
+                ? `${guardados} item(s) salvos com sucesso!`
+                : `¡${guardados} item(s) guardados exitosamente!`;
+            
+            try {
+                sessionStorage.setItem('toast_pendiente', JSON.stringify({
+                    tipo: 'success',
+                    mensaje: msg
+                }));
+            } catch (e) {}
+            
             itemsPendientes = [];
             renderizarItemsPendientes();
             
-            // Cerrar modal
-            document.getElementById('modal-producto').style.display = 'none';
-            
-            // ✅ SOLUCIÓN: Recargar la página para mostrar los items actualizados
-            // Esto evita errores de DOM y siempre muestra los datos reales
             window.location.reload();
         } else {
-            Toast.error(t('errorGuardar') + ' ' + (data.error || ''));
+            Toast.error((t('errorGuardar') || 'Error') + ' ' + (data.error || ''));
         }
     })
     .catch(e => {
         btn.disabled = false;
-        btn.textContent = t('guardarTodos');
+        btn.textContent = textoOriginal;
         Toast.error('Error: ' + e.message);
     });
-}
-
-function agregarFilaTabla(item, itemId) {
-    const tbody = document.getElementById('items-tbody');
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-        <td>${escapeHtml(item.nombre_item)}</td>
-        <td>-</td>
-        <td>${item.cantidad}</td>
-        <td>${escapeHtml(item.unidad_medida || '-')}</td>
-        <td>${item.fecha_requerida}</td>
-        <td><span class="estado-badge estado-solicitado">Solicitado</span></td>
-        <td>
-            <a href="../items/actualizar_estado.php?id=${itemId}&proyecto=${PROYECTO_ID}" class="btn-small">Estado</a>
-            <a href="../items/editar.php?id=${itemId}&proyecto=${PROYECTO_ID}" class="btn-small">Editar</a>
-        </td>
-    `;
-    tbody.insertBefore(tr, tbody.firstChild);
 }
 
 // ============ UTILIDADES ============
@@ -335,7 +377,18 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Cerrar modal al hacer click fuera
+function formatearFecha(fecha) {
+    if (!fecha) return '-';
+    const partes = fecha.split('-');
+    if (partes.length !== 3) return fecha;
+    return partes[2] + '/' + partes[1] + '/' + partes[0];
+}
+
+function t(key) {
+    return (window.TRAD && TRAD[key]) ? TRAD[key] : key;
+}
+
+// ============ INICIALIZACIÓN ============
 document.addEventListener('DOMContentLoaded', function() {
     const modal = document.getElementById('modal-producto');
     if (modal) {
@@ -343,14 +396,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e.target === modal) cerrarModalProducto();
         });
         
-        // Poner fecha de hoy por defecto
         const fechaInput = document.getElementById('item-fecha');
-        if (fechaInput) {
+        if (fechaInput && !fechaInput.value) {
             const hoy = new Date().toISOString().split('T')[0];
             fechaInput.value = hoy;
         }
         
-        // Enter para agregar item
         const inputs = ['item-nombre', 'item-cantidad', 'item-unidad', 'item-fecha'];
         inputs.forEach(id => {
             const el = document.getElementById(id);

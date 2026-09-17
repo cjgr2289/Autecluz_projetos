@@ -5,12 +5,10 @@ require_once '../../includes/functions.php';
 
 // Si ya está logueado, redirigir
 if (isset($_SESSION['usuario_id'])) {
-    header('Location: ../../index.php');
-    exit();
+    redirigir('index.php');
 }
 
 $error = '';
-$debug = '';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $username = trim($_POST['username'] ?? '');
@@ -25,30 +23,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->execute([$username]);
             $usuario = $stmt->fetch();
             
-            if (!$usuario) {
-                $error = 'Usuario no encontrado';
-                // Debug opcional (quitar en producción)
-                if (isset($_GET['debug'])) {
-                    $debug = "No existe usuario con username = '$username'";
-                }
-            } elseif (!password_verify($password, $usuario['password'])) {
-                $error = 'Contraseña incorrecta';
-                if (isset($_GET['debug'])) {
-                    $debug = "Usuario encontrado pero password_verify() falló.<br>";
-                    $debug .= "Hash en BD: " . htmlspecialchars($usuario['password']) . "<br>";
-                    $debug .= "Longitud hash: " . strlen($usuario['password']) . "<br>";
-                    $debug .= "Password ingresado: " . htmlspecialchars($password);
-                }
-            } else {
-                // Login exitoso
+            if ($usuario && password_verify($password, $usuario['password'])) {
                 $_SESSION['usuario_id'] = $usuario['id'];
                 $_SESSION['username'] = $usuario['username'];
                 $_SESSION['nombre_completo'] = $usuario['nombre_completo'];
                 $_SESSION['tipo_usuario'] = $usuario['tipo_usuario'];
                 $_SESSION['idioma'] = $usuario['idioma_preferido'] ?? 'es';
                 
-                header('Location: ../../index.php');
-                exit();
+                // ✅ Verificar si debe cambiar contraseña
+                $debe_cambiar = !empty($usuario['debe_cambiar_password']);
+                
+                if ($debe_cambiar) {
+                    $_SESSION['forzar_cambio_password'] = true;
+                    redirigir('modules/perfil/cambiar_password.php?forzar=1');
+                } else {
+                    redirigir('index.php');
+                }
+            } else {
+                $error = 'Usuario o contraseña incorrectos';
             }
         } catch (PDOException $e) {
             $error = 'Error de base de datos: ' . $e->getMessage();
@@ -62,10 +54,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Sistema de Proyectos</title>
-    <link rel="stylesheet" href="../../assets/css/style.css">
-    <link rel="stylesheet" href="../../assets/css/login.css">
-    <link rel="stylesheet" href="../../assets/css/formularios.css">
-    <link rel="stylesheet" href="../../assets/css/mensajes.css">
+    <link rel="stylesheet" href="<?php echo url('assets/css/style.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/login.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/formularios.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/mensajes.css'); ?>">
 </head>
 <body>
     <div class="login-container">
@@ -74,12 +66,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
             <?php if ($error): ?>
                 <div class="error-message"><?php echo htmlspecialchars($error); ?></div>
-            <?php endif; ?>
-            
-            <?php if ($debug): ?>
-                <div style="background:#fff3cd; padding:1rem; border-radius:4px; margin-bottom:1rem; font-size:0.85rem;">
-                    <strong>Debug:</strong><br><?php echo $debug; ?>
-                </div>
             <?php endif; ?>
             
             <form method="POST" action="">

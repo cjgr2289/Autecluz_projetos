@@ -42,14 +42,16 @@ $estados_proyecto = getEstadosProyecto();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo traducir('Dashboard'); ?></title>
-    <link rel="stylesheet" href="assets/css/style.css">
-    <link rel="stylesheet" href="assets/css/navbar.css">
-    <link rel="stylesheet" href="assets/css/tablas.css">
-    <link rel="stylesheet" href="assets/css/badges.css">
-    <link rel="stylesheet" href="assets/css/dashboard.css">
-    <link rel="stylesheet" href="assets/css/proyectos.css">
-    <link rel="stylesheet" href="assets/css/footer.css">
+    <title><?php echo traducir('Dashboard'); ?> - Sistema</title>
+    <link rel="stylesheet" href="<?php echo url('assets/css/style.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/navbar.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/tablas.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/badges.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/dashboard.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/proyectos.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/ui.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/notificaciones.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/footer.css'); ?>">
 </head>
 <body>
     <?php include 'includes/header.php'; ?>
@@ -87,8 +89,7 @@ $estados_proyecto = getEstadosProyecto();
                             <?php foreach ($ultimos_proyectos as $proyecto): ?>
                             <tr>
                                 <td class="col-nombre-proyecto">
-                                    <!-- LINK al proyecto -->
-                                    <a href="modules/proyectos/ver.php?id=<?php echo $proyecto['id']; ?>" 
+                                    <a href="<?php echo url('modules/proyectos/ver.php?id=' . $proyecto['id']); ?>" 
                                        class="proyecto-link">
                                         <div class="proyecto-nombre"><?php echo htmlspecialchars($proyecto['nombre']); ?></div>
                                     </a>

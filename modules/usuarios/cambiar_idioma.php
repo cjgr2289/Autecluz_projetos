@@ -22,7 +22,6 @@ try {
     $stmt = $db->prepare("UPDATE usuarios SET idioma_preferido = ? WHERE id = ?");
     $stmt->execute([$idioma, $_SESSION['usuario_id']]);
     
-    // Actualizar en sesión
     $_SESSION['idioma'] = $idioma;
     
     echo json_encode(['success' => true, 'idioma' => $idioma]);

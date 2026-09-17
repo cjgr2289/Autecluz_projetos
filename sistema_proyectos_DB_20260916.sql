@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 14-09-2026 a las 22:46:05
+-- Tiempo de generación: 16-09-2026 a las 22:03:55
 -- Versión del servidor: 10.4.32-MariaDB
 -- Versión de PHP: 8.2.12
 
@@ -44,8 +44,8 @@ INSERT INTO `categorias` (`id`, `nombre`, `descripcion`, `activo`, `fecha_creaci
 (2, 'Materiais de Construçao', 'Cemento, areia, ferro, etc.', 1, '2026-09-10 11:23:17'),
 (3, 'Eletricos', 'Cabos, tomadas, interruptor, fios, conectores,', 1, '2026-09-10 11:23:17'),
 (4, 'Encanamento', 'eletrodutos, conexoes, chuveros, torneira, canos', 1, '2026-09-10 11:23:17'),
-(5, 'Tintas', 'Pinturas, brochas, rodillos', 1, '2026-09-10 11:23:17'),
-(6, 'Segurança', 'Equipos de protección personal', 1, '2026-09-10 11:23:17'),
+(5, 'Pinturas', 'Pinturas, brochas, rodillos', 1, '2026-09-10 11:23:17'),
+(6, 'Seguridad', 'Equipos de protección personal', 1, '2026-09-10 11:23:17'),
 (7, 'Escritorio', 'Materiais de escritorio', 1, '2026-09-10 11:23:17'),
 (8, 'Informática', 'Equipos y accesorios de computación', 1, '2026-09-10 11:23:17'),
 (9, 'Otros', 'Productos no clasificados', 1, '2026-09-10 11:23:17');
@@ -151,7 +151,11 @@ CREATE TABLE `items_proyecto` (
   `fecha_compra` date DEFAULT NULL,
   `unidad_medida` varchar(50) DEFAULT NULL,
   `especificaciones` text DEFAULT NULL,
-  `estado` enum('solicitado','pendiente','stock','cotacion','orçado','pendiente_pago','comprado_llegar','llego') DEFAULT 'solicitado',
+  `estado` enum('solicitado','pendiente','stock','cotacion','orçado','pendiente_pago','comprado_llegar','llego','entregado','recibido') DEFAULT 'solicitado',
+  `entregado_por` int(11) DEFAULT NULL,
+  `fecha_entrega` datetime DEFAULT NULL,
+  `recibido_por` int(11) DEFAULT NULL,
+  `fecha_recepcion` datetime DEFAULT NULL,
   `fecha_requerida` date NOT NULL,
   `fecha_creacion` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -160,36 +164,36 @@ CREATE TABLE `items_proyecto` (
 -- Volcado de datos para la tabla `items_proyecto`
 --
 
-INSERT INTO `items_proyecto` (`id`, `proyecto_id`, `producto_id`, `nombre_item`, `descripcion`, `cantidad`, `costo_unitario`, `moneda`, `proveedor`, `numero_factura`, `fecha_compra`, `unidad_medida`, `especificaciones`, `estado`, `fecha_requerida`, `fecha_creacion`) VALUES
-(1, 1, 1, 'Tomada Steck de 32 A 3P+T Macho', NULL, 2, NULL, 'USD', NULL, NULL, NULL, 'UNIDAD', '', 'pendiente', '2026-09-14', '2026-09-11 11:29:26'),
-(2, 1, 2, 'Tomada Steck de 32 A 3P+T FÊMEA', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'UNIDAD', '', 'pendiente', '2026-09-14', '2026-09-11 11:34:13'),
-(3, 1, 4, 'Conector M16 IP65 12 Pinos Fêmea', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', '2026-09-14', '2026-09-14 10:56:14'),
-(4, 1, 5, 'Conector IFM M12 montável Macho', NULL, 2, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', '2026-09-14', '2026-09-14 10:56:14'),
-(5, 1, 6, 'Conector IFM M12 montável Fêmea', NULL, 2, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', '2026-09-14', '2026-09-14 10:56:15'),
-(6, 1, 3, 'Conector M16 IP65 12 Pinos Macho 5A', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', '2026-09-14', '2026-09-14 10:56:15'),
-(7, 1, 8, 'Conexão Festo 10MM / SMC FÊMEA', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', '2026-09-14', '2026-09-14 13:01:08'),
-(8, 1, 7, 'Conexão Festo 10 mm / SMC MACHO', NULL, 2, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', '2026-09-14', '2026-09-14 13:01:09'),
-(9, 1, 9, 'Painel 350x280x175mm', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', '2026-09-14', '2026-09-14 16:08:20'),
-(10, 1, 10, 'Cabo PP 4 X 2,5 mm²', NULL, 3, NULL, 'USD', NULL, NULL, NULL, 'm', '', 'pendiente', '2026-09-14', '2026-09-14 16:09:14'),
-(29, 2, NULL, 'Luvas / Marcadores', NULL, 50, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', '2026-09-21', '2026-09-14 17:08:33'),
-(30, 2, 11, 'Caixa termoplástica com tampa (250 x 200 x 130 mm)', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', '2026-09-14', '2026-09-14 17:09:49'),
-(31, 2, 12, 'Trecho de trilho DIN 35mm perfurado', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', '2026-09-21', '2026-09-14 17:09:49'),
-(32, 2, NULL, 'Disjuntor DIN Unipolar/Bipolar (C6A)', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', '2026-09-21', '2026-09-14 17:09:49'),
-(33, 2, NULL, 'Fonte Chaveada DIN Entrada: 100-240VAC / Saída: 24VDC - 2,5A', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', '2026-09-21', '2026-09-14 17:09:49'),
-(34, 2, NULL, 'Controlador de Temperatura Spirax Sarco SX-UNI', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', '2026-09-21', '2026-09-14 17:09:49'),
-(35, 2, NULL, 'Relé de Interface DIN com base (Contato SPDT / Reversor)', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', '2026-09-21', '2026-09-14 17:09:49'),
-(36, 2, NULL, 'Sensor de temperatura ambiente (ex: PT100 haste/cabeçote)', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', '2026-09-21', '2026-09-14 17:09:49'),
-(37, 2, 5, 'Conector IFM M12 montável Macho', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', '2026-09-21', '2026-09-14 17:09:49'),
-(38, 2, 6, 'Conector IFM M12 montável Fêmea', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', '2026-09-21', '2026-09-14 17:09:49'),
-(39, 2, NULL, 'Prensa-cabos termoplástico PG9 / PG11 com contra-porca', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', '2026-09-21', '2026-09-14 17:09:49'),
-(40, 2, NULL, 'Bornes de passagem tipo KRG / SAK 1,5 mm', NULL, 8, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', '2026-09-21', '2026-09-14 17:09:49'),
-(41, 2, NULL, 'Poste final / Trava para trilho DIN', NULL, 2, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', '2026-09-21', '2026-09-14 17:09:49'),
-(42, 2, NULL, 'parafuso rosca soberba', NULL, 6, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', '2026-09-21', '2026-09-14 17:09:49'),
-(43, 2, NULL, 'Fio flexível 1,5 mm² Preto', NULL, 10, NULL, 'USD', NULL, NULL, NULL, 'm', '', 'pendiente', '2026-09-21', '2026-09-14 17:09:49'),
-(44, 2, NULL, 'Fio flexível 1,5 mm² Azul Claro', NULL, 10, NULL, 'USD', NULL, NULL, NULL, 'm', '', 'pendiente', '2026-09-21', '2026-09-14 17:09:49'),
-(45, 2, NULL, 'Fio flexível 1 mm² azul Oscuro', NULL, 10, NULL, 'USD', NULL, NULL, NULL, 'm', '', 'pendiente', '2026-09-21', '2026-09-14 17:09:49'),
-(46, 2, NULL, 'Fio flexível 1 mm² CINZA', NULL, 10, NULL, 'USD', NULL, NULL, NULL, 'm', '', 'pendiente', '2026-09-21', '2026-09-14 17:09:49'),
-(47, 2, NULL, 'Cabo PP de comando blindado/manga (ex: 3x0,75mm²)', NULL, 5, NULL, 'USD', NULL, NULL, NULL, 'm', '', 'pendiente', '2026-09-21', '2026-09-14 17:09:49');
+INSERT INTO `items_proyecto` (`id`, `proyecto_id`, `producto_id`, `nombre_item`, `descripcion`, `cantidad`, `costo_unitario`, `moneda`, `proveedor`, `numero_factura`, `fecha_compra`, `unidad_medida`, `especificaciones`, `estado`, `entregado_por`, `fecha_entrega`, `recibido_por`, `fecha_recepcion`, `fecha_requerida`, `fecha_creacion`) VALUES
+(1, 1, 1, 'Tomada Steck de 32 A 3P+T Macho', NULL, 2, NULL, 'USD', NULL, NULL, NULL, 'UNIDAD', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-14', '2026-09-11 11:29:26'),
+(2, 1, 2, 'Tomada Steck de 32 A 3P+T FÊMEA', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'UNIDAD', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-14', '2026-09-11 11:34:13'),
+(3, 1, 4, 'Conector M16 IP65 12 Pinos Fêmea', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-14', '2026-09-14 10:56:14'),
+(4, 1, 5, 'Conector IFM M12 montável Macho', NULL, 2, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-14', '2026-09-14 10:56:14'),
+(5, 1, 6, 'Conector IFM M12 montável Fêmea', NULL, 2, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-14', '2026-09-14 10:56:15'),
+(6, 1, 3, 'Conector M16 IP65 12 Pinos Macho 5A', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-14', '2026-09-14 10:56:15'),
+(7, 1, 8, 'Conexão Festo 10MM / SMC FÊMEA', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-14', '2026-09-14 13:01:08'),
+(8, 1, 7, 'Conexão Festo 10 mm / SMC MACHO', NULL, 2, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-14', '2026-09-14 13:01:09'),
+(9, 1, 9, 'Painel 350x280x175mm', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-14', '2026-09-14 16:08:20'),
+(10, 1, 10, 'Cabo PP 4 X 2,5 mm²', NULL, 3, NULL, 'USD', NULL, NULL, NULL, 'm', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-14', '2026-09-14 16:09:14'),
+(29, 2, NULL, 'Luvas / Marcadores', NULL, 50, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-21', '2026-09-14 17:08:33'),
+(30, 2, 11, 'Caixa termoplástica com tampa (250 x 200 x 130 mm)', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-14', '2026-09-14 17:09:49'),
+(31, 2, 12, 'Trecho de trilho DIN 35mm perfurado', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-21', '2026-09-14 17:09:49'),
+(32, 2, NULL, 'Disjuntor DIN Unipolar/Bipolar (C6A)', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-21', '2026-09-14 17:09:49'),
+(33, 2, NULL, 'Fonte Chaveada DIN Entrada: 100-240VAC / Saída: 24VDC - 2,5A', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-21', '2026-09-14 17:09:49'),
+(34, 2, NULL, 'Controlador de Temperatura Spirax Sarco SX-UNI', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-21', '2026-09-14 17:09:49'),
+(35, 2, NULL, 'Relé de Interface DIN com base (Contato SPDT / Reversor)', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-21', '2026-09-14 17:09:49'),
+(36, 2, NULL, 'Sensor de temperatura ambiente (ex: PT100 haste/cabeçote)', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-21', '2026-09-14 17:09:49'),
+(37, 2, 5, 'Conector IFM M12 montável Macho', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-21', '2026-09-14 17:09:49'),
+(38, 2, 6, 'Conector IFM M12 montável Fêmea', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-21', '2026-09-14 17:09:49'),
+(39, 2, NULL, 'Prensa-cabos termoplástico PG9 / PG11 com contra-porca', NULL, 1, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-21', '2026-09-14 17:09:49'),
+(40, 2, NULL, 'Bornes de passagem tipo KRG / SAK 1,5 mm', NULL, 8, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-21', '2026-09-14 17:09:49'),
+(41, 2, NULL, 'Poste final / Trava para trilho DIN', NULL, 2, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-21', '2026-09-14 17:09:49'),
+(42, 2, NULL, 'parafuso rosca soberba', NULL, 6, NULL, 'USD', NULL, NULL, NULL, 'unidad', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-21', '2026-09-14 17:09:49'),
+(43, 2, NULL, 'Fio flexível 1,5 mm² Preto', NULL, 10, NULL, 'USD', NULL, NULL, NULL, 'm', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-21', '2026-09-14 17:09:49'),
+(44, 2, NULL, 'Fio flexível 1,5 mm² Azul Claro', NULL, 10, NULL, 'USD', NULL, NULL, NULL, 'm', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-21', '2026-09-14 17:09:49'),
+(45, 2, NULL, 'Fio flexível 1 mm² azul Oscuro', NULL, 10, NULL, 'USD', NULL, NULL, NULL, 'm', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-21', '2026-09-14 17:09:49'),
+(46, 2, NULL, 'Fio flexível 1 mm² CINZA', NULL, 10, NULL, 'USD', NULL, NULL, NULL, 'm', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-21', '2026-09-14 17:09:49'),
+(47, 2, NULL, 'Cabo PP de comando blindado/manga (ex: 3x0,75mm²)', NULL, 5, NULL, 'USD', NULL, NULL, NULL, 'm', '', 'pendiente', NULL, NULL, NULL, NULL, '2026-09-21', '2026-09-14 17:09:49');
 
 -- --------------------------------------------------------
 
@@ -204,6 +208,61 @@ CREATE TABLE `notificaciones_leidas` (
   `referencia_id` int(11) NOT NULL,
   `fecha_lectura` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `notificaciones_leidas`
+--
+
+INSERT INTO `notificaciones_leidas` (`id`, `usuario_id`, `tipo`, `referencia_id`, `fecha_lectura`) VALUES
+(1, 1, 'item_vencido', 6, '2026-09-16 12:51:38'),
+(2, 1, 'item_vencido', 1, '2026-09-16 12:51:39'),
+(3, 1, 'item_vencido', 9, '2026-09-16 12:51:40'),
+(4, 1, 'item_vencido', 4, '2026-09-16 12:51:41'),
+(5, 1, 'item_vencido', 7, '2026-09-16 12:51:41'),
+(6, 1, 'item_vencido', 2, '2026-09-16 12:51:41'),
+(7, 1, 'item_vencido', 10, '2026-09-16 12:51:42'),
+(8, 1, 'item_vencido', 5, '2026-09-16 12:51:42'),
+(9, 1, 'item_vencido', 8, '2026-09-16 12:51:42'),
+(10, 1, 'item_vencido', 3, '2026-09-16 12:51:43'),
+(11, 1, 'item_vencido', 30, '2026-09-16 12:51:43'),
+(12, 1, 'item_proximo', 35, '2026-09-16 12:51:43'),
+(13, 1, 'item_proximo', 43, '2026-09-16 12:51:45'),
+(14, 1, 'item_proximo', 46, '2026-09-16 12:51:45'),
+(15, 1, 'item_proximo', 29, '2026-09-16 12:51:45'),
+(16, 1, 'item_proximo', 38, '2026-09-16 12:51:46'),
+(17, 1, 'item_proximo', 33, '2026-09-16 12:51:46'),
+(18, 1, 'item_proximo', 41, '2026-09-16 12:51:46'),
+(19, 1, 'item_proximo', 44, '2026-09-16 12:51:46'),
+(20, 1, 'item_proximo', 36, '2026-09-16 12:51:47'),
+(21, 1, 'item_proximo', 47, '2026-09-16 12:51:47'),
+(22, 1, 'item_proximo', 31, '2026-09-16 12:51:48'),
+(23, 1, 'item_proximo', 39, '2026-09-16 12:51:48'),
+(24, 1, 'item_proximo', 34, '2026-09-16 12:51:49'),
+(25, 1, 'item_proximo', 42, '2026-09-16 12:51:49'),
+(26, 1, 'item_proximo', 45, '2026-09-16 12:51:50'),
+(27, 1, 'item_proximo', 37, '2026-09-16 12:51:50'),
+(28, 1, 'item_proximo', 32, '2026-09-16 12:51:50'),
+(29, 1, 'item_proximo', 40, '2026-09-16 12:51:50'),
+(30, 1, 'item_agregado', 32, '2026-09-16 12:51:50'),
+(31, 1, 'item_agregado', 31, '2026-09-16 12:51:52'),
+(32, 1, 'item_agregado', 47, '2026-09-16 12:51:53'),
+(33, 1, 'item_agregado', 46, '2026-09-16 12:51:53'),
+(34, 1, 'item_agregado', 30, '2026-09-16 12:51:53'),
+(35, 1, 'item_agregado', 45, '2026-09-16 12:51:53'),
+(36, 1, 'item_agregado', 44, '2026-09-16 12:51:54'),
+(37, 1, 'item_agregado', 43, '2026-09-16 12:51:54'),
+(38, 1, 'item_agregado', 42, '2026-09-16 12:51:54'),
+(39, 1, 'item_agregado', 41, '2026-09-16 12:51:54'),
+(40, 1, 'item_agregado', 40, '2026-09-16 12:51:54'),
+(41, 1, 'item_agregado', 39, '2026-09-16 12:51:54'),
+(42, 1, 'item_agregado', 38, '2026-09-16 12:51:55'),
+(43, 1, 'item_agregado', 37, '2026-09-16 12:51:55'),
+(44, 1, 'item_agregado', 36, '2026-09-16 12:51:55'),
+(45, 1, 'item_agregado', 35, '2026-09-16 12:51:55'),
+(46, 1, 'item_agregado', 34, '2026-09-16 12:51:55'),
+(47, 1, 'item_agregado', 33, '2026-09-16 12:51:56'),
+(48, 1, 'item_agregado', 29, '2026-09-16 12:51:59'),
+(49, 1, 'item_agregado', 10, '2026-09-16 12:52:00');
 
 -- --------------------------------------------------------
 
@@ -280,19 +339,23 @@ CREATE TABLE `usuarios` (
   `password` varchar(255) NOT NULL,
   `nombre_completo` varchar(100) NOT NULL,
   `email` varchar(100) DEFAULT NULL,
-  `tipo_usuario` enum('directivo','gerenciador','supervisor','compras','proyectista') NOT NULL,
+  `tipo_usuario` enum('directivo','gerenciador','supervisor','compras','proyectista','almacen') NOT NULL,
   `idioma_preferido` enum('es','pt') DEFAULT 'es',
   `fecha_creacion` timestamp NOT NULL DEFAULT current_timestamp(),
-  `activo` tinyint(1) DEFAULT 1
+  `activo` tinyint(1) DEFAULT 1,
+  `debe_cambiar_password` tinyint(1) DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Volcado de datos para la tabla `usuarios`
 --
 
-INSERT INTO `usuarios` (`id`, `username`, `password`, `nombre_completo`, `email`, `tipo_usuario`, `idioma_preferido`, `fecha_creacion`, `activo`) VALUES
-(1, 'Master', '$2y$10$YhzYTI9x7M/YNiiNmwdbOen9qMIBfzY7EcpScQ7UqKDFbzC61Itm6', 'Administrador Master', 'carlosgomez@autecluz.com', 'directivo', 'pt', '2026-09-10 11:23:17', 1),
-(2, 'Heloisa.luz', '$2y$10$qfdhj98AuIzEhiTUDcdtwOUJwbzmeiE019zivHNlGnvK4gYUmtjiq', 'Heloisa Luz', 'carlosgomez@autecluz.com', 'compras', 'pt', '2026-09-10 19:53:43', 1);
+INSERT INTO `usuarios` (`id`, `username`, `password`, `nombre_completo`, `email`, `tipo_usuario`, `idioma_preferido`, `fecha_creacion`, `activo`, `debe_cambiar_password`) VALUES
+(1, 'Master', '$2y$10$YhzYTI9x7M/YNiiNmwdbOen9qMIBfzY7EcpScQ7UqKDFbzC61Itm6', 'Administrador Master', 'carlosgomez@autecluz.com', 'directivo', 'es', '2026-09-10 11:23:17', 1, 0),
+(2, 'Heloisa.luz', '$2y$10$qfdhj98AuIzEhiTUDcdtwOUJwbzmeiE019zivHNlGnvK4gYUmtjiq', 'Heloisa Luz', 'heloisa@autecluz.com', 'compras', 'pt', '2026-09-10 19:53:43', 1, 0),
+(3, 'CARLA.SOUZA', '$2y$10$YRQx7GZqS481su8WtrDuhOfDxSmQ48DCOZplzNOQS0OZAZBTjapmm', 'CARLA SOUZA', 'Compras@autecluz.com', 'compras', 'pt', '2026-09-16 10:42:29', 1, 0),
+(4, 'DANIEL.PAICO', '$2y$10$1284lFTsimaUU.8ViYKEtOPo4kUJlqQMEudN7l5acq2DO.y.Z9rSu', 'ERIK DANIEL PAICO', 'daniel@autecluz.com', 'almacen', 'es', '2026-09-16 13:16:50', 1, 0),
+(6, 'Carlos.Gomez', '$2y$10$9OA/p48eOMtL.K9utOzc5.NqLjW0uFbCc80ivtWsUN8rbYe2V2R7G', 'Carlos Gomez', 'carlosgomez2289@gmail.com', 'almacen', 'es', '2026-09-16 18:27:39', 1, 0);
 
 --
 -- Índices para tablas volcadas
@@ -329,7 +392,9 @@ ALTER TABLE `items_proyecto`
   ADD KEY `idx_proyecto` (`proyecto_id`),
   ADD KEY `idx_producto` (`producto_id`),
   ADD KEY `idx_items_estado` (`estado`),
-  ADD KEY `idx_items_proyecto_estado` (`proyecto_id`,`estado`);
+  ADD KEY `idx_items_proyecto_estado` (`proyecto_id`,`estado`),
+  ADD KEY `entregado_por` (`entregado_por`),
+  ADD KEY `recibido_por` (`recibido_por`);
 
 --
 -- Indices de la tabla `notificaciones_leidas`
@@ -396,7 +461,7 @@ ALTER TABLE `items_proyecto`
 -- AUTO_INCREMENT de la tabla `notificaciones_leidas`
 --
 ALTER TABLE `notificaciones_leidas`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=50;
 
 --
 -- AUTO_INCREMENT de la tabla `productos`
@@ -414,7 +479,7 @@ ALTER TABLE `proyectos`
 -- AUTO_INCREMENT de la tabla `usuarios`
 --
 ALTER TABLE `usuarios`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- Restricciones para tablas volcadas
@@ -439,7 +504,9 @@ ALTER TABLE `historial_proyectos`
 --
 ALTER TABLE `items_proyecto`
   ADD CONSTRAINT `items_proyecto_ibfk_1` FOREIGN KEY (`proyecto_id`) REFERENCES `proyectos` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `items_proyecto_ibfk_2` FOREIGN KEY (`producto_id`) REFERENCES `productos` (`id`) ON DELETE SET NULL;
+  ADD CONSTRAINT `items_proyecto_ibfk_2` FOREIGN KEY (`producto_id`) REFERENCES `productos` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `items_proyecto_ibfk_3` FOREIGN KEY (`entregado_por`) REFERENCES `usuarios` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `items_proyecto_ibfk_4` FOREIGN KEY (`recibido_por`) REFERENCES `usuarios` (`id`) ON DELETE SET NULL;
 
 --
 -- Filtros para la tabla `notificaciones_leidas`

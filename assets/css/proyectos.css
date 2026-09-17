@@ -456,24 +456,42 @@
     }
 }
 
-/* Dropdown de reportes */
+/* ============================================
+   DROPDOWN DE REPORTES
+   ============================================ */
 .dropdown-reportes {
     position: relative;
     display: inline-block;
+    /* Asegurar que no bloquee clics cuando está cerrado */
+    z-index: 10;
 }
 
 .dropdown-reportes .dropdown-menu {
     position: absolute;
-    top: 100%;
+    top: calc(100% + 4px);
     right: 0;
     background: white;
     border-radius: 6px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-    min-width: 220px;
-    z-index: 100;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+    min-width: 230px;
+    z-index: 1000;
     padding: 0.35rem 0;
     margin-top: 0.25rem;
     border: 1px solid #e9ecef;
+    
+    /* Oculto por defecto (más seguro que display:none) */
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-6px);
+    transition: opacity 0.15s, visibility 0.15s, transform 0.15s;
+    pointer-events: none;
+}
+
+.dropdown-reportes.abierto .dropdown-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
 }
 
 .dropdown-reportes .dropdown-menu a {

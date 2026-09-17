@@ -1,7 +1,11 @@
 <?php
 // modules/login/logout.php
-session_start();
+require_once '../../includes/functions.php';
+
+$_SESSION = [];
+
 session_destroy();
-header('Location: login.php');
+
+header('Location: ' . url('modules/login/login.php'));
 exit();
 ?>

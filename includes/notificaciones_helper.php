@@ -38,7 +38,7 @@ function obtenerNotificaciones($db, $usuario_id) {
                 WHERE nl.usuario_id = ? AND nl.tipo = 'item_vencido' AND nl.referencia_id = i.id) as leida
         FROM items_proyecto i
         JOIN proyectos p ON i.proyecto_id = p.id
-        WHERE i.estado NOT IN ('llego', 'stock')
+        WHERE i.estado NOT IN ('llego', 'stock', 'entregado', 'recibido')
           AND p.estado NOT IN ('finalizado', 'terminado', 'pendiente_cobro_cliente')
           AND i.fecha_requerida < CURDATE()
         ORDER BY i.fecha_requerida ASC
@@ -62,7 +62,7 @@ function obtenerNotificaciones($db, $usuario_id) {
                 WHERE nl.usuario_id = ? AND nl.tipo = 'item_proximo' AND nl.referencia_id = i.id) as leida
         FROM items_proyecto i
         JOIN proyectos p ON i.proyecto_id = p.id
-        WHERE i.estado NOT IN ('llego', 'stock')
+        WHERE i.estado NOT IN ('llego', 'stock', 'entregado', 'recibido')
           AND p.estado NOT IN ('finalizado', 'terminado', 'pendiente_cobro_cliente')
           AND i.fecha_requerida BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
         ORDER BY i.fecha_requerida ASC

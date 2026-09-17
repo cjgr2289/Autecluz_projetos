@@ -1,7 +1,9 @@
 // assets/js/notificaciones.js
 // Sistema de notificaciones - carga y muestra el panel
 
-const NOTIF_URL_BASE = '/sistema_proyectos/modules/notificaciones/';
+// Usar la URL base global definida en header.php
+const NOTIF_URL_BASE = (window.BASE_URL || '/') + 'modules/notificaciones/';
+
 let notificacionesCache = null;
 let notifRefreshInterval = null;
 let panelAbierto = false;
@@ -19,8 +21,7 @@ const NOTIF_TEXTOS = {
     diasRestantes: 'días restantes',
     venceHoy: 'Vence hoy',
     agregadoPor: 'Agregado por',
-    modificadoPor: 'Modificado por',
-    en: 'en'
+    modificadoPor: 'Modificado por'
 };
 
 // ============================================
@@ -138,22 +139,18 @@ function renderizarPanel(notif) {
     
     let html = '';
     
-    // VENCIDOS
     if (notif.vencidos?.length > 0) {
         html += renderGrupo('vencidos', '🚨', NOTIF_TEXTOS.vencidos, notif.vencidos, renderItemVencido);
     }
     
-    // PRÓXIMOS
     if (notif.proximos?.length > 0) {
         html += renderGrupo('proximos', '⏰', NOTIF_TEXTOS.proximos, notif.proximos, renderItemProximo);
     }
     
-    // MODIFICADOS
     if (notif.modificados?.length > 0) {
         html += renderGrupo('modificados', '✎', NOTIF_TEXTOS.modificados, notif.modificados, renderItemModificado);
     }
     
-    // AGREGADOS
     if (notif.agregados?.length > 0) {
         html += renderGrupo('agregados', '🆕', NOTIF_TEXTOS.agregados, notif.agregados, renderItemAgregado);
     }
@@ -257,7 +254,7 @@ function renderItemAgregado(n) {
 // ACCIONES
 // ============================================
 function abrirProyecto(proyectoId) {
-    window.location.href = '/sistema_proyectos/modules/proyectos/ver.php?id=' + proyectoId;
+    window.location.href = (window.BASE_URL || '/') + 'modules/proyectos/ver.php?id=' + proyectoId;
 }
 
 function marcarLeida(tipo, referenciaId) {
@@ -320,13 +317,10 @@ function formatearFecha(fecha) {
 // INICIALIZACIÓN
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
-    // Cargar al inicio
     cargarNotificaciones(true);
     
-    // Auto-refresh cada 60 segundos
     notifRefreshInterval = setInterval(() => cargarNotificaciones(true), 60000);
     
-    // Cerrar panel al hacer click fuera
     document.addEventListener('click', function(e) {
         const panel = document.getElementById('panel-notificaciones');
         const btn = document.getElementById('btn-notificaciones');
@@ -337,7 +331,6 @@ document.addEventListener('DOMContentLoaded', function() {
         cerrarPanelNotificaciones();
     });
     
-    // Cerrar con ESC
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
             cerrarPanelNotificaciones();

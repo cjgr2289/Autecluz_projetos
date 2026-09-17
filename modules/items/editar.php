@@ -4,7 +4,7 @@ require_once '../../config/database.php';
 require_once '../../includes/functions.php';
 verificarSesion();
 
-if (!tienePermiso(['compras', 'directivo', 'gerenciador', 'supervisor', 'proyectista']) && !esMaster()) {
+if (!tienePermiso(['compras', 'directivo', 'gerenciador', 'supervisor', 'proyectista','almacen']) && !esMaster()) {
     header('Location: ../proyectos/index.php');
     exit();
 }

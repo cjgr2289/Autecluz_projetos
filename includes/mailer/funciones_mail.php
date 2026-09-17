@@ -8,18 +8,12 @@ require_once __DIR__ . '/Mailer.php';
 
 /**
  * Traduce un texto a un idioma específico (no al de la sesión actual).
- * Se usa para enviar correos en el idioma del RECEPTOR.
  */
 function traducirParaIdioma($texto, $idioma) {
-    // Guardar idioma actual para restaurar después
     $idioma_anterior = $_SESSION['idioma'] ?? 'es';
     $_SESSION['idioma'] = $idioma;
-    
     $traduccion = traducir($texto);
-    
-    // Restaurar
     $_SESSION['idioma'] = $idioma_anterior;
-    
     return $traduccion;
 }
 
@@ -28,11 +22,9 @@ function traducirParaIdioma($texto, $idioma) {
  */
 function renderizarPlantilla($nombre_plantilla, $vars = []) {
     $path = __DIR__ . '/plantillas/' . $nombre_plantilla . '.php';
-    
     if (!file_exists($path)) {
         return '';
     }
-    
     extract($vars);
     ob_start();
     include $path;
@@ -60,148 +52,13 @@ function obtenerUsuarioPorId($db, $id) {
     return $stmt->fetch();
 }
 
-
 // ============================================
-// NOTIFICACIÓN 2: Cambio de estado de un item
-// ============================================
-
-/**
- * Envía un correo al usuario que creó el proyecto (solicitante) cuando un item
- * cambia de estado.
- * 
- * @param PDO $db
- * @param int $item_id
- * @param string $estado_anterior
- * @param string $estado_nuevo
- * @param int $usuario_cambio_id  Usuario que realizó el cambio
- * @param string $comentario
- * @return bool
- */
-function notificarCambioEstadoItem($db, $item_id, $estado_anterior, $estado_nuevo, $usuario_cambio_id, $comentario = '') {
-    // Obtener item + proyecto + creador del proyecto
-    $stmt = $db->prepare("
-        SELECT i.*, 
-               p.id as proyecto_id, p.nombre as proyecto_nombre, 
-               p.usuario_creacion as solicitante_id,
-               u.nombre_completo as solicitante_nombre, 
-               u.email as solicitante_email,
-               u.idioma_preferido as solicitante_idioma
-        FROM items_proyecto i
-        JOIN proyectos p ON i.proyecto_id = p.id
-        LEFT JOIN usuarios u ON p.usuario_creacion = u.id
-        WHERE i.id = ?
-    ");
-    $stmt->execute([$item_id]);
-    $item = $stmt->fetch();
-    
-    if (!$item || empty($item['solicitante_email'])) return false;
-    
-    // Obtener nombre del usuario que hizo el cambio
-    $stmt = $db->prepare("SELECT nombre_completo FROM usuarios WHERE id = ?");
-    $stmt->execute([$usuario_cambio_id]);
-    $usuario_cambio = $stmt->fetch();
-    
-    $idioma = $item['solicitante_idioma'] ?? 'es';
-    $estados_item = getEstadosItemParaIdioma($idioma);
-    
-    // Renderizar plantilla
-    $html = renderizarPlantilla('item_estado_cambiado', [
-        'idioma'            => $idioma,
-        'item'              => $item,
-        'estado_anterior'   => $estados_item[$estado_anterior] ?? $estado_anterior,
-        'estado_nuevo'      => $estados_item[$estado_nuevo] ?? $estado_nuevo,
-        'usuario_cambio'    => $usuario_cambio['nombre_completo'] ?? '',
-        'comentario'        => $comentario,
-    ]);
-    
-    $asunto = $idioma === 'pt'
-        ? 'Atualização de status do item: ' . $item['nombre_item']
-        : 'Actualización de estado del item: ' . $item['nombre_item'];
-    
-    $mailer = new Mailer();
-    return $mailer->enviar($item['solicitante_email'], $asunto, $html);
-}
-
-/**
- * Devuelve los estados de item en un idioma específico (sin depender de la sesión)
- */
-function getEstadosItemParaIdioma($idioma) {
-    $estados = [
-        'es' => [
-            'solicitado' => 'Solicitado',
-            'pendiente' => 'Pendiente',
-            'stock' => 'En Stock',
-            'cotacion' => 'Cotación',
-            'orçado' => 'Orçado',
-            'pendiente_pago' => 'Pendiente por Pago',
-            'comprado_llegar' => 'Comprado por Llegar',
-            'llego' => 'Llegó'
-        ],
-        'pt' => [
-            'solicitado' => 'Solicitado',
-            'pendiente' => 'Pendente',
-            'stock' => 'Em Estoque',
-            'cotacion' => 'Cotação',
-            'orçado' => 'Orçado',
-            'pendiente_pago' => 'Pendente de Pagamento',
-            'comprado_llegar' => 'Comprado a Chegar',
-            'llego' => 'Chegou'
-        ]
-    ];
-    return $estados[$idioma] ?? $estados['es'];
-}
-
-// ============================================
-// NOTIFICACIÓN 3: Nuevo usuario creado
-// ============================================
-
-/**
- * Envía un correo de bienvenida al nuevo usuario con sus credenciales.
- * 
- * @param PDO $db
- * @param int $usuario_id
- * @param string $password_temporal  Contraseña en texto plano (solo para este envío)
- * @return bool
- */
-function notificarUsuarioCreado($db, $usuario_id, $password_temporal) {
-    $usuario = obtenerUsuarioPorId($db, $usuario_id);
-    if (!$usuario || empty($usuario['email'])) return false;
-    
-    $idioma = $usuario['idioma_preferido'] ?? 'es';
-    
-    // Login URL
-    $protocolo = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-    $login_url = $protocolo . '://' . $host . '/sistema_proyectos/modules/login/login.php';
-    
-    // Renderizar plantilla
-    $html = renderizarPlantilla('usuario_creado', [
-        'idioma'            => $idioma,
-        'usuario'           => $usuario,
-        'password_temporal' => $password_temporal,
-        'login_url'         => $login_url,
-    ]);
-    
-    $asunto = $idioma === 'pt'
-        ? 'Bem-vindo ao Sistema de Projetos'
-        : 'Bienvenido al Sistema de Proyectos';
-    
-    $mailer = new Mailer();
-    return $mailer->enviar($usuario['email'], $asunto, $html);
-}
-
-// ============================================
-// NOTIFICACIÓN 1: Items agregados (MEJORADA)
+// NOTIFICACIÓN 1: Items agregados (AGRUPADA)
 // ============================================
 
 /**
  * Envía UN SOLO correo a todos los usuarios de compras cuando se agregan
  * uno o más items a un proyecto (agrupado por idioma).
- * 
- * @param PDO $db
- * @param int $proyecto_id
- * @param array $items_agregados  Array de items agregados en el lote
- * @return bool
  */
 function notificarItemsAgregados($db, $proyecto_id, $items_agregados) {
     if (empty($items_agregados)) return false;
@@ -228,11 +85,16 @@ function notificarItemsAgregados($db, $proyecto_id, $items_agregados) {
         $por_idioma[$idioma][] = $u;
     }
     
+    // URL base para los enlaces dentro del correo
+    $base_url = getBaseUrl();
+    $url_proyecto = $base_url . 'modules/proyectos/ver.php?id=' . $proyecto_id;
+    
     foreach ($por_idioma as $idioma => $usuarios) {
         $html = renderizarPlantilla('item_agregado', [
-            'idioma'   => $idioma,
-            'proyecto' => $proyecto,
-            'items'    => $items_agregados,
+            'idioma'        => $idioma,
+            'proyecto'      => $proyecto,
+            'items'         => $items_agregados,
+            'url_proyecto'  => $url_proyecto,
         ]);
         
         $cantidad_items = count($items_agregados);
@@ -240,7 +102,6 @@ function notificarItemsAgregados($db, $proyecto_id, $items_agregados) {
             ? "Novos itens adicionados ao projeto: {$proyecto['nombre']} ($cantidad_items)"
             : "Nuevos items agregados al proyecto: {$proyecto['nombre']} ($cantidad_items)";
         
-        // UN solo correo con todos los destinatarios (en copia oculta para privacidad)
         $emails = array_column($usuarios, 'email');
         $ok = $mailer->enviar($emails, $asunto, $html);
         if (!$ok) $exito_total = false;
@@ -250,46 +111,13 @@ function notificarItemsAgregados($db, $proyecto_id, $items_agregados) {
 }
 
 // ============================================
-// NOTIFICACIÓN 4: Item editado (cantidad, fecha, etc.)
+// NOTIFICACIÓN 2: Cambio de estado de un item
 // ============================================
 
 /**
- * Notifica al solicitante del proyecto cuando un item es editado
- * (cantidad, fecha, unidad, nombre, especificaciones).
- * 
- * @param PDO $db
- * @param int $item_id
- * @param array $datos_anteriores  ['nombre_item','cantidad','unidad_medida','fecha_requerida','especificaciones']
- * @param array $datos_nuevos      Mismos campos con valores nuevos
- * @param int $usuario_edito_id
- * @return bool
+ * Envía un correo al usuario que creó el proyecto cuando un item cambia de estado.
  */
-function notificarItemEditado($db, $item_id, $datos_anteriores, $datos_nuevos, $usuario_edito_id) {
-    // Detectar qué campos cambiaron
-    $campos_comparables = ['nombre_item', 'cantidad', 'unidad_medida', 'fecha_requerida', 'especificaciones'];
-    $cambios = [];
-    
-    foreach ($campos_comparables as $campo) {
-        $ant = $datos_anteriores[$campo] ?? null;
-        $nue = $datos_nuevos[$campo] ?? null;
-        
-        // Normalizar para comparación
-        if ($campo === 'cantidad') {
-            $ant = (int)$ant;
-            $nue = (int)$nue;
-        } else {
-            $ant = trim((string)$ant);
-            $nue = trim((string)$nue);
-        }
-        
-        if ($ant !== $nue) {
-            $cambios[$campo] = ['anterior' => $ant, 'nuevo' => $nue];
-        }
-    }
-    
-    if (empty($cambios)) return false; // nada cambió
-    
-    // Obtener item + proyecto + solicitante
+function notificarCambioEstadoItem($db, $item_id, $estado_anterior, $estado_nuevo, $usuario_cambio_id, $comentario = '') {
     $stmt = $db->prepare("
         SELECT i.*, 
                p.id as proyecto_id, p.nombre as proyecto_nombre, 
@@ -307,14 +135,158 @@ function notificarItemEditado($db, $item_id, $datos_anteriores, $datos_nuevos, $
     
     if (!$item || empty($item['solicitante_email'])) return false;
     
-    // Nombre del usuario que editó
+    $stmt = $db->prepare("SELECT nombre_completo FROM usuarios WHERE id = ?");
+    $stmt->execute([$usuario_cambio_id]);
+    $usuario_cambio = $stmt->fetch();
+    
+    $idioma = $item['solicitante_idioma'] ?? 'es';
+    $estados_item = getEstadosItemParaIdioma($idioma);
+    
+    // URL del proyecto
+    $url_proyecto = getBaseUrl() . 'modules/proyectos/ver.php?id=' . $item['proyecto_id'];
+    
+    $html = renderizarPlantilla('item_estado_cambiado', [
+        'idioma'            => $idioma,
+        'item'              => $item,
+        'estado_anterior'   => $estados_item[$estado_anterior] ?? $estado_anterior,
+        'estado_nuevo'      => $estados_item[$estado_nuevo] ?? $estado_nuevo,
+        'usuario_cambio'    => $usuario_cambio['nombre_completo'] ?? '',
+        'comentario'        => $comentario,
+        'url_proyecto'      => $url_proyecto,
+    ]);
+    
+    $asunto = $idioma === 'pt'
+        ? 'Atualização de status do item: ' . $item['nombre_item']
+        : 'Actualización de estado del item: ' . $item['nombre_item'];
+    
+    $mailer = new Mailer();
+    return $mailer->enviar($item['solicitante_email'], $asunto, $html);
+}
+
+/**
+ * Devuelve los estados de item en un idioma específico.
+ */
+function getEstadosItemParaIdioma($idioma) {
+    $estados = [
+        'es' => [
+            'solicitado'       => 'Solicitado',
+            'pendiente'        => 'Pendiente',
+            'stock'            => 'En Stock',
+            'cotacion'         => 'Cotación',
+            'orçado'           => 'Orçado',
+            'pendiente_pago'   => 'Pendiente por Pago',
+            'comprado_llegar'  => 'Comprado por Llegar',
+            'llego'            => 'Llegó',
+            'entregado'        => 'Entregado',
+            'recibido'         => 'Recibido',
+        ],
+        'pt' => [
+            'solicitado'       => 'Solicitado',
+            'pendiente'        => 'Pendente',
+            'stock'            => 'Em Estoque',
+            'cotacion'         => 'Cotação',
+            'orçado'           => 'Orçado',
+            'pendiente_pago'   => 'Pendente de Pagamento',
+            'comprado_llegar'  => 'Comprado a Chegar',
+            'llego'            => 'Chegou',
+            'entregado'        => 'Entregue',
+            'recibido'         => 'Recebido',
+        ]
+    ];
+    return $estados[$idioma] ?? $estados['es'];
+}
+
+// ============================================
+// NOTIFICACIÓN 3: Nuevo usuario creado
+// ============================================
+
+/**
+ * Envía un correo de bienvenida al nuevo usuario con sus credenciales.
+ * 
+ * ✅ CORREGIDO: usa getBaseUrl() para construir la URL correcta
+ *    tanto en localhost como en el hosting.
+ */
+function notificarUsuarioCreado($db, $usuario_id, $password_temporal) {
+    $usuario = obtenerUsuarioPorId($db, $usuario_id);
+    if (!$usuario || empty($usuario['email'])) return false;
+    
+    $idioma = $usuario['idioma_preferido'] ?? 'es';
+    
+    // ✅ Usar getBaseUrl() que detecta automáticamente el entorno
+    // En localhost → https://localhost/sistema_proyectos/
+    // En hosting   → https://projetos.autecluz.com/
+    $base_url = getBaseUrl();
+    $login_url = $base_url . 'modules/login/login.php';
+    
+    $html = renderizarPlantilla('usuario_creado', [
+        'idioma'            => $idioma,
+        'usuario'           => $usuario,
+        'password_temporal' => $password_temporal,
+        'login_url'         => $login_url,
+        'base_url'          => $base_url,
+    ]);
+    
+    $asunto = $idioma === 'pt'
+        ? 'Bem-vindo ao Sistema de Projetos'
+        : 'Bienvenido al Sistema de Proyectos';
+    
+    $mailer = new Mailer();
+    return $mailer->enviar($usuario['email'], $asunto, $html);
+}
+
+// ============================================
+// NOTIFICACIÓN 4: Item editado
+// ============================================
+
+/**
+ * Notifica al solicitante del proyecto cuando un item es editado.
+ */
+function notificarItemEditado($db, $item_id, $datos_anteriores, $datos_nuevos, $usuario_edito_id) {
+    $campos_comparables = ['nombre_item', 'cantidad', 'unidad_medida', 'fecha_requerida', 'especificaciones'];
+    $cambios = [];
+    
+    foreach ($campos_comparables as $campo) {
+        $ant = $datos_anteriores[$campo] ?? null;
+        $nue = $datos_nuevos[$campo] ?? null;
+        
+        if ($campo === 'cantidad') {
+            $ant = (int)$ant;
+            $nue = (int)$nue;
+        } else {
+            $ant = trim((string)$ant);
+            $nue = trim((string)$nue);
+        }
+        
+        if ($ant !== $nue) {
+            $cambios[$campo] = ['anterior' => $ant, 'nuevo' => $nue];
+        }
+    }
+    
+    if (empty($cambios)) return false;
+    
+    $stmt = $db->prepare("
+        SELECT i.*, 
+               p.id as proyecto_id, p.nombre as proyecto_nombre, 
+               p.usuario_creacion as solicitante_id,
+               u.nombre_completo as solicitante_nombre, 
+               u.email as solicitante_email,
+               u.idioma_preferido as solicitante_idioma
+        FROM items_proyecto i
+        JOIN proyectos p ON i.proyecto_id = p.id
+        LEFT JOIN usuarios u ON p.usuario_creacion = u.id
+        WHERE i.id = ?
+    ");
+    $stmt->execute([$item_id]);
+    $item = $stmt->fetch();
+    
+    if (!$item || empty($item['solicitante_email'])) return false;
+    
     $stmt = $db->prepare("SELECT nombre_completo FROM usuarios WHERE id = ?");
     $stmt->execute([$usuario_edito_id]);
     $usuario_edito = $stmt->fetch();
     
     $idioma = $item['solicitante_idioma'] ?? 'es';
     
-    // Etiquetas traducidas de unidades para mostrar
     $unidades = [
         'es' => ['unidad' => 'Unidad', 'caja' => 'Caja', 'kg' => 'Kilogramo (kg)', 'm' => 'Metro (m)'],
         'pt' => ['unidad' => 'Unidade', 'caja' => 'Caixa', 'kg' => 'Quilograma (kg)', 'm' => 'Metro (m)'],
@@ -324,7 +296,6 @@ function notificarItemEditado($db, $item_id, $datos_anteriores, $datos_nuevos, $
         return $unidades[$idioma][$cod] ?? $cod;
     };
     
-    // Preparar datos formateados para la plantilla
     $cambios_formateados = [];
     foreach ($cambios as $campo => $vals) {
         $anterior = $vals['anterior'];
@@ -344,12 +315,14 @@ function notificarItemEditado($db, $item_id, $datos_anteriores, $datos_nuevos, $
         ];
     }
     
-    // Renderizar plantilla
+    $url_proyecto = getBaseUrl() . 'modules/proyectos/ver.php?id=' . $item['proyecto_id'];
+    
     $html = renderizarPlantilla('item_editado', [
-        'idioma'    => $idioma,
-        'item'      => $item,
-        'cambios'   => $cambios_formateados,
-        'usuario'   => $usuario_edito['nombre_completo'] ?? '',
+        'idioma'       => $idioma,
+        'item'         => $item,
+        'cambios'      => $cambios_formateados,
+        'usuario'      => $usuario_edito['nombre_completo'] ?? '',
+        'url_proyecto' => $url_proyecto,
     ]);
     
     $asunto = $idioma === 'pt'
@@ -361,22 +334,15 @@ function notificarItemEditado($db, $item_id, $datos_anteriores, $datos_nuevos, $
 }
 
 // ============================================
-// NOTIFICACIÓN 5: Resumen semanal (lunes)
+// NOTIFICACIÓN 5: Resumen semanal
 // ============================================
 
 /**
- * Envía un resumen semanal a compras, directivos y gerenciadores con:
- *   - Items que no han cambiado de estado en la última semana
- *   - Items cuya fecha_requerida está próxima (7 días o menos)
- *   - Items ya vencidos
- * 
- * @param PDO $db
- * @return array  ['enviados' => int, 'errores' => array]
+ * Envía un resumen semanal a compras, directivos y gerenciadores.
  */
 function enviarResumenSemanal($db) {
     $resultado = ['enviados' => 0, 'errores' => []];
     
-    // Obtener items problemáticos
     $items_estancados = obtenerItemsEstancados($db, 7);
     $items_proximos = obtenerItemsProximosAVencer($db, 7);
     $items_vencidos = obtenerItemsVencidos($db);
@@ -386,7 +352,6 @@ function enviarResumenSemanal($db) {
         return $resultado;
     }
     
-    // Destinatarios: compras + directivo + gerenciador
     $destinatarios = [];
     foreach (['compras', 'directivo', 'gerenciador'] as $tipo) {
         $destinatarios = array_merge($destinatarios, obtenerUsuariosPorTipo($db, $tipo));
@@ -397,7 +362,6 @@ function enviarResumenSemanal($db) {
         return $resultado;
     }
     
-    // Agrupar por idioma
     $por_idioma = [];
     foreach ($destinatarios as $u) {
         $idioma = $u['idioma_preferido'] ?? 'es';
@@ -405,6 +369,7 @@ function enviarResumenSemanal($db) {
     }
     
     $mailer = new Mailer();
+    $url_proyectos = getBaseUrl() . 'modules/proyectos/index.php';
     
     foreach ($por_idioma as $idioma => $usuarios) {
         $html = renderizarPlantilla('resumen_semanal', [
@@ -413,6 +378,7 @@ function enviarResumenSemanal($db) {
             'items_proximos'   => $items_proximos,
             'items_vencidos'   => $items_vencidos,
             'fecha'            => date('d/m/Y'),
+            'url_proyectos'    => $url_proyectos,
         ]);
         
         $asunto = $idioma === 'pt'

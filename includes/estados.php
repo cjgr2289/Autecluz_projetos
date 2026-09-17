@@ -48,24 +48,28 @@ function getEstadosItem() {
     
     $estados = [
         'es' => [
-            'solicitado' => 'Solicitado',
-            'pendiente' => 'Pendiente',
-            'stock' => 'En Stock',
-            'cotacion' => 'Cotación',
-            'orçado' => 'Orçado',
-            'pendiente_pago' => 'Pendiente por Pago',
-            'comprado_llegar' => 'Comprado por Llegar',
-            'llego' => 'Llegó'
+            'solicitado'       => 'Solicitado',
+            'pendiente'        => 'Pendiente',
+            'stock'            => 'En Stock',
+            'cotacion'         => 'Cotación',
+            'orçado'           => 'Orçado',
+            'pendiente_pago'   => 'Pendiente por Pago',
+            'comprado_llegar'  => 'Comprado por Llegar',
+            'llego'            => 'Llegó',
+            'entregado'        => 'Entregado',
+            'recibido'         => 'Recibido',
         ],
         'pt' => [
-            'solicitado' => 'Solicitado',
-            'pendiente' => 'Pendente',
-            'stock' => 'Em Estoque',
-            'cotacion' => 'Cotação',
-            'orçado' => 'Orçado',
-            'pendiente_pago' => 'Pendente de Pagamento',
-            'comprado_llegar' => 'Comprado a Chegar',
-            'llego' => 'Chegou'
+            'solicitado'       => 'Solicitado',
+            'pendiente'        => 'Pendente',
+            'stock'            => 'Em Estoque',
+            'cotacion'         => 'Cotação',
+            'orçado'           => 'Orçado',
+            'pendiente_pago'   => 'Pendente de Pagamento',
+            'comprado_llegar'  => 'Comprado a Chegar',
+            'llego'            => 'Chegou',
+            'entregado'        => 'Entregue',
+            'recibido'         => 'Recebido',
         ]
     ];
     

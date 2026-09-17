@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $activo = isset($_POST['activo']) ? 1 : 0;
     }
     
-    $tipos_validos = ['directivo', 'gerenciador', 'supervisor', 'compras', 'proyectista'];
+    $tipos_validos = ['directivo', 'gerenciador', 'supervisor', 'compras', 'proyectista', 'alamacen'];
     
     if (empty($nombre_completo) || !in_array($tipo_usuario, $tipos_validos)) {
         $error = 'Datos inválidos';
@@ -109,10 +109,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <div class="form-row">
                     <div class="form-group">
                         <label>Tipo de Usuario</label>
-                        <select name="tipo_usuario" <?php echo $es_usuario_master ? 'disabled' : ''; ?>>
-                            <?php foreach (['directivo', 'gerenciador', 'supervisor', 'compras', 'proyectista'] as $t): ?>
+                        <select name="tipo_usuario">
+                            <?php foreach (['directivo', 'gerenciador', 'supervisor', 'compras', 'proyectista', 'almacen'] as $t): ?>
                                 <option value="<?php echo $t; ?>" <?php echo $usuario['tipo_usuario'] == $t ? 'selected' : ''; ?>>
-                                    <?php echo ucfirst($t); ?>
+                                    <?php echo traducir(ucfirst($t)); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>

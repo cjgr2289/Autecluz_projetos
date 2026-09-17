@@ -24,7 +24,7 @@
         const formData = new FormData();
         formData.append('idioma', idioma);
         
-        fetch('/sistema_proyectos/modules/usuarios/cambiar_idioma.php', {
+        fetch(window.BASE_URL + 'modules/usuarios/cambiar_idioma.php', {
             method: 'POST',
             body: formData
         })

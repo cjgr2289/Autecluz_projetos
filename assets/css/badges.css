@@ -84,3 +84,16 @@
 .btn-icon[style*="cursor:not-allowed"] {
     pointer-events: none;
 }
+/* Estados de entrega y recepción */
+.estado-entregado {
+    background-color: #c8e6c9;
+    color: #1b5e20;
+    font-weight: 600;
+}
+
+.estado-recibido {
+    background-color: #a5d6a7;
+    color: #1b5e20;
+    font-weight: 700;
+    border: 1px solid #81c784;
+}

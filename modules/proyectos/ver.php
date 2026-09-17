@@ -8,8 +8,7 @@ $db = Database::getInstance()->getConnection();
 $proyecto_id = $_GET['id'] ?? 0;
 
 if (!$proyecto_id) {
-    header('Location: index.php');
-    exit();
+    redirigir('modules/proyectos/index.php');
 }
 
 // Datos del proyecto
@@ -21,8 +20,7 @@ $stmt->execute([$proyecto_id]);
 $proyecto = $stmt->fetch();
 
 if (!$proyecto) {
-    header('Location: index.php');
-    exit();
+    redirigir('modules/proyectos/index.php');
 }
 
 // Items con info del producto y categoría
@@ -57,16 +55,21 @@ $historial_items = $stmt->fetchAll();
 
 $estados_proyecto = getEstadosProyecto();
 $estados_item = getEstadosItem();
-$puede_agregar_items = tienePermiso(['compras', 'directivo', 'gerenciador', 'supervisor', 'proyectista']);
-$puede_cambiar_estado_item = tienePermiso(['compras', 'directivo', 'gerenciador']);
+$puede_agregar_items = tienePermiso(['compras', 'directivo', 'gerenciador', 'supervisor', 'proyectista', 'almacen']) || esMaster();
+$puede_cambiar_estado_item = tienePermiso(['compras', 'directivo', 'gerenciador', 'almacen']) || esMaster();
+$puede_editar_proyecto = tienePermiso(['directivo', 'gerenciador', 'proyectista']) || esMaster();
 
 // Estadísticas rápidas
 $total_items = count($items);
 $items_pendientes = 0;
 $items_llegaron = 0;
+$items_entregados = 0;
+$items_recibidos = 0;
 foreach ($items as $it) {
     if (in_array($it['estado'], ['solicitado', 'pendiente', 'cotacion'])) $items_pendientes++;
     if ($it['estado'] === 'llego') $items_llegaron++;
+    if ($it['estado'] === 'entregado') $items_entregados++;
+    if ($it['estado'] === 'recibido') $items_recibidos++;
 }
 ?>
 <!DOCTYPE html>
@@ -74,9 +77,21 @@ foreach ($items as $it) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo htmlspecialchars($proyecto['nombre']); ?></title>
-    <link rel="stylesheet" href="../../assets/css/style.css">
-    <link rel="stylesheet" href="../../assets/css/footer.css">
+    <title><?php echo htmlspecialchars($proyecto['nombre']); ?> - Sistema</title>
+    
+    <!-- CSS modular completo -->
+    <link rel="stylesheet" href="<?php echo url('assets/css/style.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/navbar.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/formularios.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/tablas.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/badges.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/mensajes.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/proyectos.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/items.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/modal.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/ui.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/notificaciones.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/footer.css'); ?>">
 </head>
 <body>
     <?php include '../../includes/header.php'; ?>
@@ -94,48 +109,44 @@ foreach ($items as $it) {
                         <?php echo $estados_proyecto[$proyecto['estado']] ?? $proyecto['estado']; ?>
                     </span>
                 </div>
+                
                 <div class="proyecto-header-actions">
                     <a href="index.php" class="btn-secondary btn-sm">← <?php echo traducir('Volver'); ?></a>
-                    <?php if (tienePermiso(['directivo', 'gerenciador', 'proyectista'])): ?>
+                    
+                    <?php if ($puede_editar_proyecto): ?>
                         <a href="editar.php?id=<?php echo $proyecto_id; ?>" class="btn-secondary btn-sm">
                             ✎ <?php echo traducir('Editar'); ?>
                         </a>
                     <?php endif; ?>
+                    
+                    <!-- Dropdown de reportes -->
+                    <div class="dropdown-reportes">
+                        <button type="button" class="btn-secondary btn-sm" onclick="toggleDropdownReportes(event)">
+                            📊 <?php echo $_SESSION['idioma'] == 'pt' ? 'Relatórios' : 'Reportes'; ?> ▾
+                        </button>
+                        <div class="dropdown-menu" id="dropdown-reportes">
+                            <a href="reporte.php?id=<?php echo $proyecto_id; ?>">
+                                📋 <?php echo $_SESSION['idioma'] == 'pt' ? 'Itens por Status' : 'Items por Estado'; ?>
+                            </a>
+                            <a href="reporte_entrega.php?id=<?php echo $proyecto_id; ?>">
+                                📦 <?php echo $_SESSION['idioma'] == 'pt' ? 'Entrega de Materiais' : 'Entrega de Materiales'; ?>
+                            </a>
+                            <a href="reporte_costos.php?id=<?php echo $proyecto_id; ?>">
+                                💰 <?php echo $_SESSION['idioma'] == 'pt' ? 'Custos' : 'Costos'; ?>
+                            </a>
+                            <?php if (tienePermiso(['compras', 'directivo', 'gerenciador']) || esMaster()): ?>
+                                <a href="editar_costos.php?id=<?php echo $proyecto_id; ?>">
+                                    ✎ <?php echo $_SESSION['idioma'] == 'pt' ? 'Editar Custos' : 'Editar Costos'; ?>
+                                </a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    
                     <?php if ($puede_agregar_items): ?>
                         <button type="button" class="btn-primary btn-sm" onclick="abrirModalProducto()">
                             + <?php echo traducir('Agregar Item'); ?>
                         </button>
                     <?php endif; ?>
-
-                    <!-- ===== NUEVOS BOTONES DE REPORTES ===== -->
-    <div class="dropdown-reportes">
-        <button type="button" class="btn-secondary btn-sm" onclick="toggleDropdownReportes(event)">
-            📊 <?php echo $_SESSION['idioma'] == 'pt' ? 'Relatórios' : 'Reportes'; ?> ▾
-        </button>
-        <div class="dropdown-menu" id="dropdown-reportes" style="display:none;">
-            <a href="reporte.php?id=<?php echo $proyecto_id; ?>">
-                📋 <?php echo $_SESSION['idioma'] == 'pt' ? 'Itens por Status' : 'Items por Estado'; ?>
-            </a>
-            <a href="reporte_entrega.php?id=<?php echo $proyecto_id; ?>">
-                📦 <?php echo $_SESSION['idioma'] == 'pt' ? 'Entrega de Materiais' : 'Entrega de Materiales'; ?>
-            </a>
-            <a href="reporte_costos.php?id=<?php echo $proyecto_id; ?>">
-                💰 <?php echo $_SESSION['idioma'] == 'pt' ? 'Custos' : 'Costos'; ?>
-            </a>
-            <?php if (tienePermiso(['compras', 'directivo', 'gerenciador']) || esMaster()): ?>
-                <a href="editar_costos.php?id=<?php echo $proyecto_id; ?>">
-                    ✎ <?php echo $_SESSION['idioma'] == 'pt' ? 'Editar Custos' : 'Editar Costos'; ?>
-                </a>
-            <?php endif; ?>
-        </div>
-    </div>
-    
-    <?php if ($puede_agregar_items): ?>
-        <button type="button" class="btn-primary btn-sm" onclick="abrirModalProducto()">
-            + <?php echo traducir('Agregar Item'); ?>
-        </button>
-    <?php endif; ?>
-                    
                 </div>
             </div>
             
@@ -196,6 +207,10 @@ foreach ($items as $it) {
             <div class="stat-mini stat-mini-success">
                 <div class="stat-mini-value"><?php echo $items_llegaron; ?></div>
                 <div class="stat-mini-label"><?php echo traducir('Llegaron'); ?></div>
+            </div>
+            <div class="stat-mini stat-mini-success">
+                <div class="stat-mini-value"><?php echo $items_entregados + $items_recibidos; ?></div>
+                <div class="stat-mini-label"><?php echo $_SESSION['idioma'] == 'pt' ? 'Entregues' : 'Entregados'; ?></div>
             </div>
         </div>
         
@@ -261,7 +276,7 @@ foreach ($items as $it) {
                                         <?php endif; ?>
                                     </td>
                                     <td class="col-item-cant"><?php echo $item['cantidad']; ?></td>
-                                    <td class="col-item-unidad"><?php echo htmlspecialchars($item['unidad_medida'] ?? '-'); ?></td>
+                                    <td class="col-item-unidad"><?php echo htmlspecialchars(getUnidadLabel($item['unidad_medida'])); ?></td>
                                     <td class="col-item-fecha"><?php echo formatearFecha($item['fecha_requerida']); ?></td>
                                     <td class="col-item-estado">
                                         <span class="estado-badge estado-<?php echo $item['estado']; ?>">
@@ -271,20 +286,20 @@ foreach ($items as $it) {
                                     <td class="col-item-acciones">
                                         <div class="acciones-grupo">
                                             <?php if ($puede_cambiar_estado_item): ?>
-                                                <a href="../items/actualizar_estado.php?id=<?php echo $item['id']; ?>&proyecto=<?php echo $proyecto_id; ?>" 
-                                                class="btn-accion btn-accion-estado" 
-                                                data-tooltip="<?php echo traducir('Estado'); ?>">
+                                                <a href="<?php echo url('modules/items/actualizar_estado.php?id=' . $item['id'] . '&proyecto=' . $proyecto_id); ?>" 
+                                                   class="btn-accion btn-accion-estado" 
+                                                   data-tooltip="<?php echo traducir('Estado'); ?>">
                                                     <?php echo icono('estado'); ?>
                                                 </a>
                                             <?php endif; ?>
                                             
-                                            <a href="../items/editar.php?id=<?php echo $item['id']; ?>&proyecto=<?php echo $proyecto_id; ?>" 
-                                            class="btn-accion btn-accion-editar" 
-                                            data-tooltip="<?php echo traducir('Editar'); ?>">
+                                            <a href="<?php echo url('modules/items/editar.php?id=' . $item['id'] . '&proyecto=' . $proyecto_id); ?>" 
+                                               class="btn-accion btn-accion-editar" 
+                                               data-tooltip="<?php echo traducir('Editar'); ?>">
                                                 <?php echo icono('editar'); ?>
                                             </a>
                                             
-                                            <?php if (tienePermiso(['directivo', 'gerenciador', 'compras'])): ?>
+                                            <?php if (tienePermiso(['directivo', 'gerenciador', 'compras']) || esMaster()): ?>
                                                 <button type="button" 
                                                         class="btn-accion btn-accion-eliminar" 
                                                         data-tooltip="<?php echo traducir('Eliminar'); ?>"
@@ -388,7 +403,7 @@ foreach ($items as $it) {
     </div>
     
     <!-- ============================================
-         MODAL AGREGAR PRODUCTO (sin cambios funcionales)
+         MODAL AGREGAR PRODUCTO
          ============================================ -->
     <?php if ($puede_agregar_items): ?>
     <div id="modal-producto" class="modal-overlay" style="display:none;">
@@ -485,14 +500,14 @@ foreach ($items as $it) {
                             <input type="number" id="item-cantidad" value="1" min="1" required>
                         </div>
                         <div class="form-group">
-    <label><?php echo traducir('Unidad de medida'); ?></label>
-    <select id="item-unidad">
-        <option value="">-- <?php echo traducir('Seleccionar'); ?> --</option>
-        <?php foreach (getUnidadesMedida() as $cod => $lbl): ?>
-            <option value="<?php echo htmlspecialchars($cod); ?>"><?php echo htmlspecialchars($lbl); ?></option>
-        <?php endforeach; ?>
-    </select>
-</div>
+                            <label><?php echo traducir('Unidad de medida'); ?></label>
+                            <select id="item-unidad">
+                                <option value="">-- <?php echo traducir('Seleccionar'); ?> --</option>
+                                <?php foreach (getUnidadesMedida() as $cod => $lbl): ?>
+                                    <option value="<?php echo htmlspecialchars($cod); ?>"><?php echo htmlspecialchars($lbl); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
                         <div class="form-group">
                             <label><?php echo traducir('Fecha Requerida'); ?> *</label>
                             <input type="date" id="item-fecha" required>
@@ -530,7 +545,6 @@ foreach ($items as $it) {
     
     <script>
     const PROYECTO_ID = <?php echo $proyecto_id; ?>;
-    const BASE_URL = '../../';
     
     // Traducciones para el modal
     const TRAD = {
@@ -570,43 +584,78 @@ foreach ($items as $it) {
         document.querySelector(`.tab-btn[data-tab="${tabName}"]`).classList.add('active');
         document.getElementById('tab-' + tabName).classList.add('active');
     }
-
-    function toggleDropdownReportes(e) {
-    e.stopPropagation();
+    
+// ===== DROPDOWN REPORTES =====
+function toggleDropdownReportes(e) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    const container = document.querySelector('.dropdown-reportes');
     const menu = document.getElementById('dropdown-reportes');
-    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    if (!container || !menu) return;
+    
+    const estaAbierto = container.classList.contains('abierto');
+    
+    // Cerrar cualquier otro dropdown abierto
+    document.querySelectorAll('.dropdown-reportes.abierto').forEach(el => {
+        if (el !== container) el.classList.remove('abierto');
+    });
+    
+    // Toggle
+    container.classList.toggle('abierto', !estaAbierto);
 }
 
-// Cerrar dropdown al hacer click fuera
+// Cerrar al hacer clic fuera
 document.addEventListener('click', function(e) {
-    const dropdown = document.getElementById('dropdown-reportes');
-    if (dropdown && !e.target.closest('.dropdown-reportes')) {
-        dropdown.style.display = 'none';
+    if (!e.target.closest('.dropdown-reportes')) {
+        document.querySelectorAll('.dropdown-reportes.abierto').forEach(el => {
+            el.classList.remove('abierto');
+        });
     }
 });
 
-
-async function confirmarEliminarItem(itemId, nombre) {
-    const idioma = '<?php echo $_SESSION['idioma']; ?>';
+// Cerrar con ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.dropdown-reportes.abierto').forEach(el => {
+            el.classList.remove('abierto');
+        });
+    }
+});
     
-    const mensaje = idioma === 'pt'
-        ? `Deseja excluir o item "${nombre}" deste projeto?`
-        : `¿Desea eliminar el item "${nombre}" de este proyecto?`;
-    
-    const ok = await Confirm.show({
-        titulo: idioma === 'pt' ? 'Excluir Item' : 'Eliminar Item',
-        mensaje: mensaje,
-        textoConfirmar: idioma === 'pt' ? 'Excluir' : 'Eliminar',
-        tipo: 'danger'
+    document.addEventListener('click', function(e) {
+        const dropdown = document.getElementById('dropdown-reportes');
+        if (dropdown && !e.target.closest('.dropdown-reportes')) {
+            dropdown.style.display = 'none';
+        }
     });
     
-    if (ok) {
-        window.location.href = '../items/eliminar.php?id=' + itemId + '&proyecto=<?php echo $proyecto_id; ?>';
+    // ===== ELIMINAR ITEM =====
+    async function confirmarEliminarItem(itemId, nombre) {
+        const idioma = '<?php echo $_SESSION['idioma']; ?>';
+        const proyectoId = <?php echo $proyecto_id; ?>;
+        
+        const mensaje = idioma === 'pt'
+            ? `Deseja excluir o item "${nombre}" deste projeto?`
+            : `¿Desea eliminar el item "${nombre}" de este proyecto?`;
+        
+        const ok = await Confirm.show({
+            titulo: idioma === 'pt' ? 'Excluir Item' : 'Eliminar Item',
+            mensaje: mensaje,
+            textoConfirmar: idioma === 'pt' ? 'Excluir' : 'Eliminar',
+            textoCancelar: idioma === 'pt' ? 'Cancelar' : 'Cancelar',
+            tipo: 'danger'
+        });
+        
+        if (ok) {
+            // ✅ Usar url() para generar la ruta absoluta correcta
+            window.location.href = '<?php echo url('modules/items/eliminar.php'); ?>?id=' + itemId + '&proyecto=' + proyectoId;
+        }
     }
-}
-
     </script>
-    <script src="../../assets/js/modal_productos.js"></script>
+    <script src="<?php echo url('assets/js/modal_productos.js'); ?>"></script>
+    <script src="<?php echo url('assets/js/notificaciones.js'); ?>"></script>
     
     <?php include '../../includes/footer.php'; ?>
 </body>

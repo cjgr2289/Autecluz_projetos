@@ -26,7 +26,8 @@ function formatearMoneda($valor, $moneda = 'USD') {
 }
 
 /**
- * Devuelve el orden preferido de los estados de items para reportes
+ * Devuelve el orden preferido de los estados de items para reportes.
+ * Incluye los nuevos estados "entregado" y "recibido".
  */
 function getOrdenEstadosItem() {
     return [
@@ -38,6 +39,8 @@ function getOrdenEstadosItem() {
         'pendiente_pago',
         'comprado_llegar',
         'llego',
+        'entregado',
+        'recibido',
     ];
 }
 
@@ -49,8 +52,14 @@ function calcularEstadisticasProyecto($items) {
     $total_cantidad = 0;
     $total_costo = 0;
     $items_con_costo = 0;
+    $items_completados = 0;      // entregado + recibido
+    $items_en_proceso = 0;       // cualquier estado intermedio
     $por_estado = [];
     $por_categoria = [];
+    
+    $estados_finales = ['entregado', 'recibido'];
+    $estados_pendientes = ['solicitado', 'pendiente', 'cotacion', 'orçado', 
+                           'pendiente_pago', 'comprado_llegar', 'llego', 'stock'];
     
     foreach ($items as $item) {
         $total_cantidad += (int)$item['cantidad'];
@@ -59,6 +68,13 @@ function calcularEstadisticasProyecto($items) {
         if ($costo > 0) {
             $total_costo += $costo * (int)$item['cantidad'];
             $items_con_costo++;
+        }
+        
+        // Categorizar por tipo de estado
+        if (in_array($item['estado'], $estados_finales)) {
+            $items_completados++;
+        } elseif (in_array($item['estado'], $estados_pendientes)) {
+            $items_en_proceso++;
         }
         
         $estado = $item['estado'];
@@ -78,14 +94,22 @@ function calcularEstadisticasProyecto($items) {
         $por_categoria[$cat]['costo'] += $costo * (int)$item['cantidad'];
     }
     
+    // Calcular porcentaje de completitud
+    $porcentaje_completado = $total_items > 0 
+        ? round(($items_completados / $total_items) * 100, 1) 
+        : 0;
+    
     return [
-        'total_items' => $total_items,
-        'total_cantidad' => $total_cantidad,
-        'total_costo' => $total_costo,
-        'items_con_costo' => $items_con_costo,
-        'items_sin_costo' => $total_items - $items_con_costo,
-        'por_estado' => $por_estado,
-        'por_categoria' => $por_categoria,
+        'total_items'              => $total_items,
+        'total_cantidad'           => $total_cantidad,
+        'total_costo'              => $total_costo,
+        'items_con_costo'          => $items_con_costo,
+        'items_sin_costo'          => $total_items - $items_con_costo,
+        'items_completados'        => $items_completados,
+        'items_en_proceso'         => $items_en_proceso,
+        'porcentaje_completado'    => $porcentaje_completado,
+        'por_estado'               => $por_estado,
+        'por_categoria'            => $por_categoria,
     ];
 }
 

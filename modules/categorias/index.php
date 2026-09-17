@@ -18,6 +18,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && $puede_gestionar) {
         try {
             $stmt = $db->prepare("INSERT INTO categorias (nombre, descripcion) VALUES (?, ?)");
             $stmt->execute([$nombre, $descripcion]);
+            
+            try {
+                sessionStorage_set('toast_pendiente', json_encode([
+                    'tipo' => 'success',
+                    'mensaje' => $_SESSION['idioma'] == 'pt' ? 'Categoria criada com sucesso!' : '¡Categoría creada exitosamente!'
+                ]));
+            } catch (Exception $e) {}
+            
             header('Location: index.php?mensaje=creado');
             exit();
         } catch (PDOException $e) {
@@ -40,20 +48,27 @@ $mensaje = $_GET['mensaje'] ?? '';
 <html lang="<?php echo $_SESSION['idioma'] ?? 'es'; ?>">
 <head>
     <meta charset="UTF-8">
-    <title><?php echo traducir('Categorias'); ?></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?php echo traducir('Categorias'); ?> - Sistema</title>
     <link rel="stylesheet" href="../../assets/css/style.css">
+    <link rel="stylesheet" href="../../assets/css/navbar.css">
     <link rel="stylesheet" href="../../assets/css/tablas.css">
     <link rel="stylesheet" href="../../assets/css/formularios.css">
     <link rel="stylesheet" href="../../assets/css/badges.css">
     <link rel="stylesheet" href="../../assets/css/mensajes.css">
+    <link rel="stylesheet" href="../../assets/css/ui.css">
+    <link rel="stylesheet" href="../../assets/css/notificaciones.css">
     <link rel="stylesheet" href="../../assets/css/footer.css">
 </head>
 <body>
     <?php include '../../includes/header.php'; ?>
+    
     <div class="container">
         <div class="page-header">
             <h1><?php echo traducir('Categorias'); ?></h1>
-            <a href="../productos/index.php" class="btn-secondary">← <?php echo traducir('Productos'); ?></a>
+            <a href="../productos/index.php" class="btn-secondary">
+                ← <?php echo traducir('Productos'); ?>
+            </a>
         </div>
         
         <?php if ($mensaje === 'creado'): ?>
@@ -75,14 +90,16 @@ $mensaje = $_GET['mensaje'] ?? '';
                 <div class="form-row">
                     <div class="form-group">
                         <label><?php echo traducir('Nombre'); ?> *</label>
-                        <input type="text" name="nombre" required>
+                        <input type="text" name="nombre" required maxlength="100">
                     </div>
                     <div class="form-group">
                         <label><?php echo traducir('Descripción'); ?></label>
-                        <input type="text" name="descripcion">
+                        <input type="text" name="descripcion" maxlength="255">
                     </div>
                 </div>
-                <button type="submit" class="btn-primary">+ <?php echo traducir('Agregar'); ?></button>
+                <button type="submit" class="btn-primary">
+                    + <?php echo traducir('Agregar'); ?>
+                </button>
             </form>
         </div>
         <?php endif; ?>
@@ -93,7 +110,7 @@ $mensaje = $_GET['mensaje'] ?? '';
                     <tr>
                         <th><?php echo traducir('Nombre'); ?></th>
                         <th><?php echo traducir('Descripción'); ?></th>
-                        <th><?php echo traducir('Productos'); ?></th>
+                        <th style="width:100px; text-align:center;"><?php echo traducir('Productos'); ?></th>
                         <?php if ($puede_gestionar): ?>
                             <th style="width:1%; text-align:center;"><?php echo traducir('Acciones'); ?></th>
                         <?php endif; ?>
@@ -109,24 +126,34 @@ $mensaje = $_GET['mensaje'] ?? '';
                         <tr>
                             <td><strong><?php echo htmlspecialchars($c['nombre']); ?></strong></td>
                             <td><?php echo htmlspecialchars($c['descripcion'] ?? '-'); ?></td>
-                            <td>
+                            <td style="text-align:center;">
                                 <span class="cat-badge"><?php echo $c['total_productos']; ?></span>
                             </td>
                             <?php if ($puede_gestionar): ?>
                             <td class="col-acciones">
-                                <a href="editar.php?id=<?php echo $c['id']; ?>" 
-                                   class="btn-icon" 
-                                   title="<?php echo traducir('Editar'); ?>">✎</a>
-                                <?php if ($c['total_productos'] == 0): ?>
-                                    <a href="eliminar.php?id=<?php echo $c['id']; ?>" 
-                                       class="btn-icon btn-icon-danger"
-                                       onclick="return confirm('<?php echo traducir('¿Está seguro?'); ?>')"
-                                       title="<?php echo traducir('Eliminar'); ?>">🗑</a>
-                                <?php else: ?>
-                                    <span class="btn-icon" 
-                                          style="opacity:0.4; cursor:not-allowed;"
-                                          title="<?php echo $_SESSION['idioma'] == 'pt' ? 'Em uso - não pode excluir' : 'En uso - no se puede eliminar'; ?>">🔒</span>
-                                <?php endif; ?>
+                                <div class="acciones-grupo">
+                                    <a href="editar.php?id=<?php echo $c['id']; ?>" 
+                                       class="btn-accion btn-accion-editar" 
+                                       data-tooltip="<?php echo traducir('Editar'); ?>">
+                                        <?php echo icono('editar'); ?>
+                                    </a>
+                                    <?php if ($c['total_productos'] == 0): ?>
+                                        <button type="button" 
+                                                class="btn-accion btn-accion-eliminar" 
+                                                data-tooltip="<?php echo traducir('Eliminar'); ?>"
+                                                onclick="confirmarEliminarCategoria(<?php echo $c['id']; ?>, '<?php echo htmlspecialchars(addslashes($c['nombre'])); ?>')">
+                                            <?php echo icono('eliminar'); ?>
+                                        </button>
+                                    <?php else: ?>
+                                        <button type="button" 
+                                                class="btn-accion" 
+                                                disabled
+                                                style="opacity:0.4; cursor:not-allowed;"
+                                                data-tooltip="<?php echo $_SESSION['idioma'] == 'pt' ? 'Em uso - não pode excluir' : 'En uso - no se puede eliminar'; ?>">
+                                            <?php echo icono('eliminar'); ?>
+                                        </button>
+                                    <?php endif; ?>
+                                </div>
                             </td>
                             <?php endif; ?>
                         </tr>
@@ -136,6 +163,43 @@ $mensaje = $_GET['mensaje'] ?? '';
             </table>
         </div>
     </div>
+    
+    <script>
+    async function confirmarEliminarCategoria(id, nombre) {
+        const idioma = '<?php echo $_SESSION['idioma']; ?>';
+        
+        const ok = await Confirm.show({
+            titulo: idioma === 'pt' ? 'Excluir Categoria' : 'Eliminar Categoría',
+            mensaje: idioma === 'pt'
+                ? `Deseja realmente excluir a categoria "${nombre}"?`
+                : `¿Realmente desea eliminar la categoría "${nombre}"?`,
+            textoConfirmar: idioma === 'pt' ? 'Excluir' : 'Eliminar',
+            textoCancelar: idioma === 'pt' ? 'Cancelar' : 'Cancelar',
+            tipo: 'danger'
+        });
+        
+        if (ok) {
+            window.location.href = 'eliminar.php?id=' + id;
+        }
+    }
+    
+    // Toast pendiente tras recargar
+    document.addEventListener('DOMContentLoaded', function() {
+        try {
+            const pendiente = sessionStorage.getItem('toast_pendiente');
+            if (pendiente) {
+                const data = JSON.parse(pendiente);
+                sessionStorage.removeItem('toast_pendiente');
+                if (typeof Toast !== 'undefined') {
+                    Toast[data.tipo] ? Toast[data.tipo](data.mensaje) : Toast.info(data.mensaje);
+                }
+            }
+        } catch(e) {}
+    });
+    </script>
+    
+    <script src="../../assets/js/notificaciones.js"></script>
+    
     <?php include '../../includes/footer.php'; ?>
 </body>
 </html>

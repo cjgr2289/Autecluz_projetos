@@ -118,6 +118,14 @@ function traducir($texto) {
                 'Pendiente por Pago' => 'Pendiente por Pago',
                 'Comprado por Llegar' => 'Comprado por Llegar',
                 'Llegó' => 'Llegó',
+                'Entregado' => 'Entregado',
+                'Recibido' => 'Recibido',
+                'Entregar' => 'Entregar',
+                'Recibir' => 'Recibir',
+                'Entregado por' => 'Entregado por',
+                'Recibido por' => 'Recibido por',
+                'Fecha de entrega' => 'Fecha de entrega',
+                'Fecha de recepción' => 'Fecha de recepción',
                 
                 // ===== Productos =====
                 'Crear nuevo producto' => 'Crear nuevo producto',
@@ -147,6 +155,7 @@ function traducir($texto) {
                 'Supervisor' => 'Supervisor',
                 'Compras' => 'Compras',
                 'Proyectista' => 'Proyectista',
+                'Almacen' => 'Almacén',  
                 
                 // ===== Modal =====
                 'Agregar Item al Proyecto' => 'Agregar Item al Proyecto',
@@ -209,7 +218,11 @@ function traducir($texto) {
                 'Todo está al día' => 'Todo está al día',
                 'Error al cargar notificaciones' => 'Error al cargar notificaciones',
 
-
+                // ===== Perfil de Usuario =====
+                'Cambiar Contraseña' => 'Cambiar Contraseña',
+                'Contraseña actual' => 'Contraseña actual',
+                'Nueva Contraseña' => 'Nueva Contraseña',
+                'Confirmar Nueva Contraseña' => 'Confirmar Nueva Contraseña',
 
             ],
             'pt' => [
@@ -308,6 +321,14 @@ function traducir($texto) {
                 'Terminado' => 'Terminado',
                 'Pendiente por Cobro' => 'Pendente de Cobrança',
                 'Finalizado' => 'Finalizado',
+                'Entregado' => 'Entregue',
+                'Recibido' => 'Recebido',
+                'Entregar' => 'Entregar',
+                'Recibir' => 'Receber',
+                'Entregado por' => 'Entregue por',
+                'Recibido por' => 'Recebido por',
+                'Fecha de entrega' => 'Data de entrega',
+                'Fecha de recepción' => 'Data de recepção',
                 
                 // ===== Estados de Item =====
                 'Pendiente' => 'Pendente',
@@ -345,6 +366,7 @@ function traducir($texto) {
                 'Supervisor' => 'Supervisor',
                 'Compras' => 'Compras',
                 'Proyectista' => 'Projetista',
+                'Almacen' => 'Almoxarifado',
                 
                 // ===== Modal =====
                 'Agregar Item al Proyecto' => 'Adicionar Item ao Projeto',
@@ -407,6 +429,11 @@ function traducir($texto) {
                 'Todo está al día' => 'Tudo em dia',
                 'Error al cargar notificaciones' => 'Erro ao carregar notificações',
 
+                // ===== Perfil de Usuario =====
+                'Cambiar Contraseña' => 'Alterar Senha',
+                'Contraseña actual' => 'Senha atual',
+                'Nueva Contraseña' => 'Nova Senha',
+                'Confirmar Nueva Contraseña' => 'Confirmar Nova Senha',
             ]
         ];
     }

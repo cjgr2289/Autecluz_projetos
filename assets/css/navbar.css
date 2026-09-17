@@ -54,3 +54,122 @@
         gap: 0.5rem;
     }
 }
+
+/* ============================================
+   MENÚ DE USUARIO EN EL NAVBAR
+   ============================================ */
+.nav-user-menu {
+    position: relative;
+}
+
+.nav-user-btn {
+    background: rgba(255, 255, 255, 0.15);
+    border: none;
+    color: white;
+    padding: 0.45rem 0.85rem;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background 0.2s;
+}
+
+.nav-user-btn:hover {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+.user-avatar {
+    font-size: 1rem;
+}
+
+.user-name {
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.user-arrow {
+    font-size: 0.65rem;
+    transition: transform 0.2s;
+}
+
+.nav-user-menu.abierto .user-arrow {
+    transform: rotate(180deg);
+}
+
+.user-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    min-width: 220px;
+    z-index: 9999;
+    overflow: hidden;
+    animation: dropdown-in 0.15s ease-out;
+}
+
+@keyframes dropdown-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.user-dropdown-header {
+    padding: 0.85rem 1rem;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.user-dropdown-header strong {
+    font-size: 0.88rem;
+    color: #2c3e50;
+}
+
+.user-dropdown-header small {
+    font-size: 0.75rem;
+    color: #7f8c8d;
+}
+
+.user-dropdown a {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.7rem 1rem;
+    color: #333;
+    text-decoration: none;
+    font-size: 0.88rem;
+    transition: background 0.15s;
+}
+
+.user-dropdown a:hover {
+    background: #f8f9fa;
+    color: var(--secondary-color);
+}
+
+.user-dropdown-logout {
+    border-top: 1px solid #e9ecef;
+    color: #e74c3c !important;
+}
+
+.user-dropdown-logout:hover {
+    background: #fbe9e7 !important;
+    color: #c0392b !important;
+}
+
+@media (max-width: 768px) {
+    .user-name {
+        display: none;
+    }
+    
+    .nav-user-btn {
+        padding: 0.4rem 0.6rem;
+    }
+}

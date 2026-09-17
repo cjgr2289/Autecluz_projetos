@@ -13,7 +13,7 @@ if (session_status() === PHP_SESSION_NONE) {
  */
 function verificarSesion() {
     if (!isset($_SESSION['usuario_id'])) {
-        header('Location: /sistema_proyectos/modules/login/login.php');
+        header('Location: ' . url('modules/login/login.php'));
         exit();
     }
 }
@@ -40,7 +40,7 @@ function esMaster() {
  */
 function requiereMaster() {
     if (!esMaster()) {
-        header('Location: /sistema_proyectos/index.php');
+        header('Location: ' . url('index.php'));
         exit();
     }
 }
