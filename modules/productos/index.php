@@ -44,15 +44,15 @@ $mensaje = $_GET['mensaje'] ?? '';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo traducir('Productos'); ?> - Sistema</title>
-    <link rel="stylesheet" href="../../assets/css/style.css">
-    <link rel="stylesheet" href="../../assets/css/navbar.css">
-    <link rel="stylesheet" href="../../assets/css/tablas.css">
-    <link rel="stylesheet" href="../../assets/css/formularios.css">
-    <link rel="stylesheet" href="../../assets/css/badges.css">
-    <link rel="stylesheet" href="../../assets/css/mensajes.css">
-    <link rel="stylesheet" href="../../assets/css/ui.css">
-    <link rel="stylesheet" href="../../assets/css/notificaciones.css">
-    <link rel="stylesheet" href="../../assets/css/footer.css">
+    <link rel="stylesheet" href="<?php echo url('assets/css/style.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/navbar.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/tablas.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/formularios.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/badges.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/mensajes.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/ui.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/notificaciones.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/footer.css'); ?>">
 </head>
 <body>
     <?php include '../../includes/header.php'; ?>
@@ -61,10 +61,10 @@ $mensaje = $_GET['mensaje'] ?? '';
         <div class="page-header">
             <h1><?php echo traducir('Productos'); ?></h1>
             <div>
-                <a href="../categorias/index.php" class="btn-secondary">
+                <a href="<?php echo url('modules/categorias/index.php'); ?>" class="btn-secondary">
                     <?php echo traducir('Categorias'); ?>
                 </a>
-                <a href="crear.php" class="btn-primary">
+                <a href="<?php echo url('modules/productos/crear.php'); ?>" class="btn-primary">
                     + <?php echo traducir('Nuevo Producto'); ?>
                 </a>
             </div>
@@ -96,7 +96,7 @@ $mensaje = $_GET['mensaje'] ?? '';
                     <?php echo traducir('Filtrar'); ?>
                 </button>
                 <?php if ($busqueda || $categoria_id): ?>
-                    <a href="index.php" class="btn-secondary"><?php echo traducir('Limpiar'); ?></a>
+                    <a href="<?php echo url('modules/productos/index.php'); ?>" class="btn-secondary"><?php echo traducir('Limpiar'); ?></a>
                 <?php endif; ?>
             </form>
         </div>
@@ -107,14 +107,15 @@ $mensaje = $_GET['mensaje'] ?? '';
                     <tr>
                         <th><?php echo traducir('Nombre'); ?></th>
                         <th><?php echo traducir('Categorias'); ?></th>
-                        <th style="width:120px;"><?php echo traducir('Unidad'); ?></th>
-                        <th style="width:120px;"><?php echo traducir('Código'); ?></th>
+                        <th style="width:110px;"><?php echo traducir('Unidad'); ?></th>
+                        <th style="width:100px;"><?php echo traducir('Código'); ?></th>
+                        <th style="width:110px; text-align:right;"><?php echo $_SESSION['idioma'] == 'pt' ? 'Custo Atual' : 'Costo Actual'; ?></th>
                         <th style="width:1%; text-align:center;"><?php echo traducir('Acciones'); ?></th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($productos)): ?>
-                        <tr><td colspan="5" class="empty-cell"><?php echo traducir('No hay productos registrados'); ?></td></tr>
+                        <tr><td colspan="6" class="empty-cell"><?php echo traducir('No hay productos registrados'); ?></td></tr>
                     <?php else: ?>
                         <?php foreach ($productos as $p): ?>
                         <tr>
@@ -131,13 +132,18 @@ $mensaje = $_GET['mensaje'] ?? '';
                                     <span class="sin-cat">—</span>
                                 <?php endif; ?>
                             </td>
-                            <td>
-                                <?php echo htmlspecialchars(getUnidadLabel($p['unidad_medida']) ?: '-'); ?>
-                            </td>
+                            <td><?php echo htmlspecialchars(getUnidadLabel($p['unidad_medida']) ?: '-'); ?></td>
                             <td><?php echo htmlspecialchars($p['codigo'] ?? '-'); ?></td>
+                            <td style="text-align:right; font-weight:600; color:#27ae60;">
+                                <?php if ($p['costo_actual'] !== null): ?>
+                                    <?php echo formatearMoneda($p['costo_actual'], $p['moneda'] ?? 'USD'); ?>
+                                <?php else: ?>
+                                    <span style="color:#ccc;">-</span>
+                                <?php endif; ?>
+                            </td>
                             <td class="col-acciones">
                                 <div class="acciones-grupo">
-                                    <a href="editar.php?id=<?php echo $p['id']; ?>" 
+                                    <a href="<?php echo url('modules/productos/editar.php?id=' . $p['id']); ?>" 
                                        class="btn-accion btn-accion-editar" 
                                        data-tooltip="<?php echo traducir('Editar'); ?>">
                                         <?php echo icono('editar'); ?>
@@ -161,38 +167,20 @@ $mensaje = $_GET['mensaje'] ?? '';
     <script>
     async function confirmarEliminarProducto(id, nombre) {
         const idioma = '<?php echo $_SESSION['idioma']; ?>';
-        
         const ok = await Confirm.show({
             titulo: idioma === 'pt' ? 'Excluir Produto' : 'Eliminar Producto',
             mensaje: idioma === 'pt'
                 ? `Deseja realmente excluir o produto "${nombre}"?\n\nO produto ficará inativo mas continuará nos projetos existentes.`
                 : `¿Realmente desea eliminar el producto "${nombre}"?\n\nEl producto quedará inactivo pero seguirá en los proyectos existentes.`,
             textoConfirmar: idioma === 'pt' ? 'Excluir' : 'Eliminar',
-            textoCancelar: idioma === 'pt' ? 'Cancelar' : 'Cancelar',
             tipo: 'danger'
         });
         
         if (ok) {
-            window.location.href = 'eliminar.php?id=' + id;
+            window.location.href = '<?php echo url('modules/productos/eliminar.php'); ?>?id=' + id;
         }
     }
-    
-    // Toast pendiente tras recargar
-    document.addEventListener('DOMContentLoaded', function() {
-        try {
-            const pendiente = sessionStorage.getItem('toast_pendiente');
-            if (pendiente) {
-                const data = JSON.parse(pendiente);
-                sessionStorage.removeItem('toast_pendiente');
-                if (typeof Toast !== 'undefined') {
-                    Toast[data.tipo] ? Toast[data.tipo](data.mensaje) : Toast.info(data.mensaje);
-                }
-            }
-        } catch(e) {}
-    });
     </script>
-    
-    <script src="../../assets/js/notificaciones.js"></script>
     
     <?php include '../../includes/footer.php'; ?>
 </body>

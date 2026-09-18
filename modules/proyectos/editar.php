@@ -6,16 +6,14 @@ verificarSesion();
 
 // Permisos: directivo, gerenciador, supervisor y proyectista pueden editar
 if (!tienePermiso(['directivo', 'gerenciador', 'supervisor', 'proyectista']) && !esMaster()) {
-    header('Location: index.php?error=no_permitido');
-    exit();
+    redirigir('modules/proyectos/index.php?error=no_permitido');
 }
 
 $db = Database::getInstance()->getConnection();
 $id = $_GET['id'] ?? 0;
 
 if (!$id) {
-    header('Location: index.php');
-    exit();
+    redirigir('modules/proyectos/index.php');
 }
 
 // Obtener el proyecto
@@ -24,9 +22,16 @@ $stmt->execute([$id]);
 $proyecto = $stmt->fetch();
 
 if (!$proyecto) {
-    header('Location: index.php');
-    exit();
+    redirigir('modules/proyectos/index.php');
 }
+
+// Cargar candidatos a encargado (supervisores y proyectistas)
+$stmt = $db->query("SELECT id, nombre_completo, tipo_usuario 
+                    FROM usuarios 
+                    WHERE tipo_usuario IN ('supervisor', 'proyectista') 
+                      AND activo = 1 
+                    ORDER BY nombre_completo");
+$encargados_disponibles = $stmt->fetchAll();
 
 $estados = getEstadosProyecto();
 $puede_cambiar_estado = tienePermiso(['directivo', 'gerenciador']) || esMaster();
@@ -43,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $estado = $_POST['estado'] ?? $estado_anterior;
     $orden_compra = trim($_POST['orden_compra'] ?? '') ?: null;
     $fecha_aprobacion = $_POST['fecha_aprobacion'] ?? null;
+    $encargado_id = !empty($_POST['encargado_id']) ? (int)$_POST['encargado_id'] : null;
     
     // Solo directivos/gerenciadores pueden cambiar el estado
     if (!$puede_cambiar_estado) {
@@ -88,7 +94,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     fecha_fin = ?, 
                     estado = ?, 
                     orden_compra = ?, 
-                    fecha_aprobacion = ?
+                    fecha_aprobacion = ?,
+                    encargado_id = ?
                 WHERE id = ?
             ");
             $stmt->execute([
@@ -99,6 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $estado, 
                 $orden_compra, 
                 !empty($fecha_aprobacion) ? $fecha_aprobacion : null,
+                $encargado_id,
                 $id
             ]);
             
@@ -145,26 +153,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         ]);
                     }
                 }
-                
-                // Si el proyecto vuelve a un estado anterior a "aprovado_cliente",
-                // los items "pendiente" podrían volver a "solicitado" (opcional)
-                // Descomentar si se quiere esta regla:
-                /*
-                if (in_array($estado, ['solicitado', 'orçado', 'pendente_aprovacion_cliente'])) {
-                    $stmt = $db->prepare("
-                        UPDATE items_proyecto 
-                        SET estado = 'solicitado' 
-                        WHERE proyecto_id = ? AND estado = 'pendiente'
-                    ");
-                    $stmt->execute([$id]);
-                }
-                */
             }
             
             $db->commit();
             
-            header('Location: ver.php?id=' . $id . '&mensaje=actualizado');
-            exit();
+            redirigir('modules/proyectos/ver.php?id=' . $id . '&mensaje=actualizado');
             
         } catch (PDOException $e) {
             $db->rollBack();
@@ -181,6 +174,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         'estado'            => $estado,
         'orden_compra'      => $orden_compra,
         'fecha_aprobacion'  => $fecha_aprobacion,
+        'encargado_id'      => $encargado_id,
     ];
 } else {
     // Valores originales del proyecto
@@ -192,6 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         'estado'            => $proyecto['estado'],
         'orden_compra'      => $proyecto['orden_compra'],
         'fecha_aprobacion'  => $proyecto['fecha_aprobacion'],
+        'encargado_id'      => $proyecto['encargado_id'] ?? null,
     ];
 }
 ?>
@@ -201,14 +196,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo traducir('Editar Proyecto'); ?> - <?php echo htmlspecialchars($proyecto['nombre']); ?></title>
-    <link rel="stylesheet" href="../../assets/css/style.css">
-    <link rel="stylesheet" href="../../assets/css/navbar.css">
-    <link rel="stylesheet" href="../../assets/css/formularios.css">
-    <link rel="stylesheet" href="../../assets/css/mensajes.css">
-    <link rel="stylesheet" href="../../assets/css/badges.css">
-    <link rel="stylesheet" href="../../assets/css/proyectos.css">
-    <link rel="stylesheet" href="../../assets/css/notificaciones.css">
-    <link rel="stylesheet" href="../../assets/css/footer.css">
+    <link rel="stylesheet" href="<?php echo url('assets/css/style.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/navbar.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/formularios.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/mensajes.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/badges.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/proyectos.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/ui.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/notificaciones.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/footer.css'); ?>">
 </head>
 <body>
     <?php include '../../includes/header.php'; ?>
@@ -217,7 +213,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <div class="page-header">
             <h1><?php echo traducir('Editar Proyecto'); ?></h1>
             <div>
-                <a href="ver.php?id=<?php echo $id; ?>" class="btn-secondary">
+                <a href="<?php echo url('modules/proyectos/ver.php?id=' . $id); ?>" class="btn-secondary">
                     ← <?php echo traducir('Volver'); ?>
                 </a>
             </div>
@@ -347,20 +343,43 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </div>
                 </div>
                 
-                <!-- ===== Orden de Compra ===== -->
-                <div class="form-group">
-                    <label for="orden_compra"><?php echo traducir('Número de Orden de Compra'); ?></label>
-                    <input type="text" 
-                           id="orden_compra" 
-                           name="orden_compra" 
-                           value="<?php echo htmlspecialchars($valores['orden_compra'] ?? ''); ?>"
-                           placeholder="<?php echo $_SESSION['idioma'] == 'pt' ? 'Ex: OC-2026-001' : 'Ej: OC-2026-001'; ?>"
-                           maxlength="50">
+                <!-- ===== Orden de Compra + Encargado ===== -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="orden_compra"><?php echo traducir('Número de Orden de Compra'); ?></label>
+                        <input type="text" 
+                               id="orden_compra" 
+                               name="orden_compra" 
+                               value="<?php echo htmlspecialchars($valores['orden_compra'] ?? ''); ?>"
+                               placeholder="<?php echo $_SESSION['idioma'] == 'pt' ? 'Ex: OC-2026-001' : 'Ej: OC-2026-001'; ?>"
+                               maxlength="50">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="encargado_id">
+                            <?php echo traducir('Encargado del Proyecto'); ?>
+                        </label>
+                        <select id="encargado_id" name="encargado_id">
+                            <option value="">-- <?php echo traducir('Seleccione un encargado'); ?> --</option>
+                            <?php foreach ($encargados_disponibles as $enc): ?>
+                                <option value="<?php echo $enc['id']; ?>"
+                                    <?php echo ($valores['encargado_id'] == $enc['id']) ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($enc['nombre_completo']); ?>
+                                    (<?php echo traducir(ucfirst($enc['tipo_usuario'])); ?>)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small style="color:#7f8c8d; display:block; margin-top:0.25rem;">
+                            <?php echo $_SESSION['idioma'] == 'pt'
+                                ? 'O responsável receberá notificações sobre mudanças nos itens.'
+                                : 'El encargado recibirá notificaciones sobre cambios en los items.'; ?>
+                        </small>
+                    </div>
                 </div>
                 
                 <!-- ===== Advertencia si cambia a aprobado por cliente ===== -->
                 <?php if ($puede_cambiar_estado): ?>
-                <div id="aviso-aprobado" style="display:none;" class="info-message" data-idioma="<?php echo $_SESSION['idioma']; ?>">
+                <div id="aviso-aprobado" style="display:none;" class="info-message">
                     <strong>⚠ <?php echo $_SESSION['idioma'] == 'pt' ? 'Atenção:' : 'Atención:'; ?></strong>
                     <span id="aviso-aprobado-texto"></span>
                 </div>
@@ -371,7 +390,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <button type="submit" class="btn-primary">
                         💾 <?php echo traducir('Actualizar'); ?>
                     </button>
-                    <a href="ver.php?id=<?php echo $id; ?>" class="btn-secondary">
+                    <a href="<?php echo url('modules/proyectos/ver.php?id=' . $id); ?>" class="btn-secondary">
                         <?php echo traducir('Cancelar'); ?>
                     </a>
                 </div>
@@ -411,7 +430,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     });
     
-    // Detectar cambio a "aprovado_cliente" y mostrar advertencia
+    // Detectar cambio a "aprovado_cliente"
     <?php if ($puede_cambiar_estado): ?>
     const estadoSelect = document.getElementById('estado');
     const aviso = document.getElementById('aviso-aprobado');
@@ -423,16 +442,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         const nuevoEstado = estadoSelect.value;
         
         if (nuevoEstado === 'aprovado_cliente' && estadoOriginal !== 'aprovado_cliente') {
-            const msg = idioma === 'pt'
+            avisoTexto.textContent = idioma === 'pt'
                 ? 'Ao salvar, todos os itens "Solicitado" deste projeto passarão automaticamente para "Pendente".'
                 : 'Al guardar, todos los items "Solicitado" de este proyecto pasarán automáticamente a "Pendiente".';
-            avisoTexto.textContent = msg;
             aviso.style.display = 'block';
         } else if (nuevoEstado !== 'aprovado_cliente' && estadoOriginal === 'aprovado_cliente') {
-            const msg = idioma === 'pt'
-                ? 'Você está revertendo o status de "Aprovado pelo Cliente". Verifique se os itens precisam ser reajustados.'
-                : 'Estás revirtiendo el estado de "Aprobado por Cliente". Verifica si los items necesitan reajustarse.';
-            avisoTexto.textContent = msg;
+            avisoTexto.textContent = idioma === 'pt'
+                ? 'Você está revertendo o status de "Aprovado pelo Cliente".'
+                : 'Estás revirtiendo el estado de "Aprobado por Cliente".';
             aviso.style.display = 'block';
         } else {
             aviso.style.display = 'none';
@@ -440,11 +457,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
     
     estadoSelect.addEventListener('change', verificarCambioEstado);
-    verificarCambioEstado(); // Verificar al cargar (por si viene con cambio previo)
+    verificarCambioEstado();
     <?php endif; ?>
     </script>
     
-    <script src="../../assets/js/notificaciones.js"></script>
+
     
     <?php include '../../includes/footer.php'; ?>
 </body>

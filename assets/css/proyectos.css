@@ -462,7 +462,6 @@
 .dropdown-reportes {
     position: relative;
     display: inline-block;
-    /* Asegurar que no bloquee clics cuando está cerrado */
     z-index: 10;
 }
 
@@ -479,7 +478,7 @@
     margin-top: 0.25rem;
     border: 1px solid #e9ecef;
     
-    /* Oculto por defecto (más seguro que display:none) */
+    /* Ocultar sin bloquear clics */
     opacity: 0;
     visibility: hidden;
     transform: translateY(-6px);

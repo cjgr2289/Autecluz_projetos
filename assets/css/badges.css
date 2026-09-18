@@ -97,3 +97,48 @@
     font-weight: 700;
     border: 1px solid #81c784;
 }
+/* Estado: Separado */
+.estado-separado {
+    background-color: #b3e5fc;
+    color: #01579b;
+    font-weight: 600;
+}
+
+.estado-separado::before {
+    content: '📋 ';
+    margin-right: 2px;
+}
+
+/* Indicador de cantidad parcial */
+.cantidad-parcial {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffe5b4;
+    margin-top: 0.25rem;
+    font-weight: 600;
+}
+
+.cantidad-completa {
+    background: #d4edda;
+    color: #155724;
+    border-color: #c3e6cb;
+}
+
+.badge-encargado {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.78rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    background: #e3f2fd;
+    color: #1565c0;
+    border: 1px solid #bbdefb;
+    font-weight: 600;
+}

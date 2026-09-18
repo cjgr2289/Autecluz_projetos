@@ -6,7 +6,7 @@ verificarSesion();
 
 header('Content-Type: application/json');
 
-if (!tienePermiso(['compras', 'directivo', 'gerenciador', 'supervisor', 'proyectista']) && !esMaster()) {
+if (!tienePermiso(['compras', 'directivo', 'gerenciador', 'supervisor', 'proyectista', 'almacen']) && !esMaster()) {
     echo json_encode(['success' => false, 'error' => 'Sin permisos']);
     exit();
 }
@@ -21,13 +21,11 @@ $unidad_medida = $_POST['unidad_medida'] ?? '';
 $fecha_requerida = $_POST['fecha_requerida'] ?? '';
 $especificaciones = $_POST['especificaciones'] ?? '';
 
-// Validaciones
 if (!$proyecto_id || empty($nombre_item) || !$fecha_requerida || $cantidad < 1) {
     echo json_encode(['success' => false, 'error' => 'Datos incompletos']);
     exit();
 }
 
-// Validar unidad de medida
 if (!empty($unidad_medida) && !esUnidadValida($unidad_medida)) {
     echo json_encode(['success' => false, 'error' => 'Unidad de medida no válida']);
     exit();
@@ -43,6 +41,23 @@ try {
         exit();
     }
 
+    // ============================================
+    // HEREDAR COSTO DEL PRODUCTO
+    // ============================================
+    $costo_unitario = null;
+    $moneda = 'USD';
+    $proveedor = null;
+    
+    if ($producto_id) {
+        $stmt = $db->prepare("SELECT costo_actual, moneda FROM productos WHERE id = ?");
+        $stmt->execute([$producto_id]);
+        $producto_data = $stmt->fetch();
+        if ($producto_data && $producto_data['costo_actual'] !== null) {
+            $costo_unitario = $producto_data['costo_actual'];
+            $moneda = $producto_data['moneda'] ?? 'USD';
+        }
+    }
+
     $estado_inicial = 'solicitado';
     if (in_array($proyecto['estado'], ['aprovado_cliente', 'espera_orden_compra', 'comprando_materiales',
                                        'elaboracion', 'terminado', 'pendiente_cobro_cliente', 'finalizado'])) {
@@ -50,9 +65,10 @@ try {
     }
 
     $stmt = $db->prepare("INSERT INTO items_proyecto 
-                          (proyecto_id, producto_id, nombre_item, cantidad, unidad_medida, 
-                           especificaciones, fecha_requerida, estado)
-                          VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                          (proyecto_id, producto_id, nombre_item, cantidad, 
+                           unidad_medida, especificaciones, fecha_requerida, estado,
+                           costo_unitario, moneda, proveedor)
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->execute([
         $proyecto_id,
         $producto_id ?: null,
@@ -61,7 +77,10 @@ try {
         $unidad_medida,
         $especificaciones,
         $fecha_requerida,
-        $estado_inicial
+        $estado_inicial,
+        $costo_unitario,
+        $moneda,
+        $proveedor
     ]);
 
     $item_id = $db->lastInsertId();
@@ -80,7 +99,7 @@ try {
         'Item creado'
     ]);
     
-    // Notificación por email
+    // Notificar
     try {
         notificarItemsAgregados($db, $proyecto_id, [[
             'nombre_item'      => $nombre_item,

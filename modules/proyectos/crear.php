@@ -24,6 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $estado = $_POST['estado'] ?? 'solicitado';
     $orden_compra = trim($_POST['orden_compra'] ?? '') ?: null;
     $fecha_aprobacion = $_POST['fecha_aprobacion'] ?? null;
+    $encargado_id = !empty($_POST['encargado_id']) ? (int)$_POST['encargado_id'] : null;
     
     // Validaciones
     if (empty($nombre)) {
@@ -66,9 +67,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
             $stmt = $db->prepare("
                 INSERT INTO proyectos 
-                    (nombre, descripcion, fecha_inicio, fecha_fin, estado, 
-                     orden_compra, fecha_aprobacion, usuario_creacion)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                      (nombre, descripcion, fecha_inicio, fecha_fin, estado, 
+                       orden_compra, fecha_aprobacion, usuario_creacion, encargado_id)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
             ");
             $stmt->execute([
                 $nombre, 
@@ -78,7 +79,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $estado, 
                 $orden_compra, 
                 !empty($fecha_aprobacion) ? $fecha_aprobacion : null,
-                $_SESSION['usuario_id']
+                $_SESSION['usuario_id'],
+                $encargado_id
             ]);
             
             $proyecto_id = $db->lastInsertId();
@@ -120,6 +122,14 @@ $valores = [
 ];
 
 $puede_cambiar_estado = tienePermiso(['directivo', 'gerenciador']) || esMaster();
+
+// Cargar supervisores y proyectistas como candidatos a encargado
+$stmt = $db->query("SELECT id, nombre_completo, tipo_usuario 
+                    FROM usuarios 
+                    WHERE tipo_usuario IN ('supervisor', 'proyectista') 
+                      AND activo = 1 
+                    ORDER BY nombre_completo");
+$encargados_disponibles = $stmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo $_SESSION['idioma'] ?? 'es'; ?>">
@@ -153,8 +163,9 @@ $puede_cambiar_estado = tienePermiso(['directivo', 'gerenciador']) || esMaster()
                         <li><?php echo htmlspecialchars($err); ?></li>
                     <?php endforeach; ?>
                 </ul>
-            </div>
+            </div>  
         <?php endif; ?>
+        
         
         <div class="form-container">
             <form method="POST" action="" id="form-proyecto">
@@ -253,6 +264,23 @@ $puede_cambiar_estado = tienePermiso(['directivo', 'gerenciador']) || esMaster()
                            value="<?php echo htmlspecialchars($valores['orden_compra']); ?>"
                            placeholder="<?php echo $_SESSION['idioma'] == 'pt' ? 'Ex: OC-2026-001' : 'Ej: OC-2026-001'; ?>"
                            maxlength="50">
+                </div>
+
+                <!-- ===== Encargado del Proyecto ===== -->
+                <div class="form-group">
+                    <label for="encargado_id">
+                        <?php echo traducir('Encargado del Proyecto'); ?>
+                    </label>
+                    <select id="encargado_id" name="encargado_id">
+                        <option value="">-- <?php echo traducir('Seleccione un encargado'); ?> --</option>
+                        <?php foreach ($encargados_disponibles as $enc): ?>
+                            <option value="<?php echo $enc['id']; ?>"
+                                <?php echo (isset($valores['encargado_id']) && $valores['encargado_id'] == $enc['id']) ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($enc['nombre_completo']); ?>
+                                (<?php echo traducir(ucfirst($enc['tipo_usuario'])); ?>)
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
                 
                 <!-- ===== Botones ===== -->

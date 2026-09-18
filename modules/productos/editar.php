@@ -12,8 +12,7 @@ $stmt->execute([$id]);
 $producto = $stmt->fetch();
 
 if (!$producto) {
-    header('Location: index.php');
-    exit();
+    redirigir('modules/productos/index.php');
 }
 
 $stmt = $db->query("SELECT * FROM categorias WHERE activo = 1 ORDER BY nombre");
@@ -25,16 +24,36 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $categoria_id = $_POST['categoria_id'] ?? null;
     $unidad_medida = $_POST['unidad_medida'] ?? '';
     $codigo = $_POST['codigo'] ?? '';
+    $costo_actual = !empty($_POST['costo_actual']) ? (float)$_POST['costo_actual'] : null;
+    $moneda = $_POST['moneda'] ?? 'USD';
+    
+    // Detectar si el costo cambió
+    $costo_anterior = $producto['costo_actual'];
+    $costo_cambio = ($costo_anterior != $costo_actual);
     
     if (empty($nombre)) {
         $error = 'El nombre es obligatorio';
     } elseif (!empty($unidad_medida) && !esUnidadValida($unidad_medida)) {
         $error = 'Unidad de medida no válida';
     } else {
-        $stmt = $db->prepare("UPDATE productos SET nombre=?, descripcion=?, categoria_id=?, unidad_medida=?, codigo=? WHERE id=?");
-        $stmt->execute([$nombre, $descripcion, $categoria_id ?: null, $unidad_medida, $codigo, $id]);
-        header('Location: index.php?mensaje=actualizado');
-        exit();
+        try {
+            $stmt = $db->prepare("UPDATE productos 
+                                  SET nombre=?, descripcion=?, categoria_id=?, unidad_medida=?, 
+                                      codigo=?, costo_actual=?, moneda=?,
+                                      fecha_ultimo_costo = CASE WHEN ? THEN CURDATE() ELSE fecha_ultimo_costo END
+                                  WHERE id=?");
+            $stmt->execute([
+                $nombre, $descripcion, $categoria_id ?: null, $unidad_medida, $codigo,
+                $costo_actual, $moneda,
+                $costo_cambio ? 1 : 0,
+                $id
+            ]);
+            
+            redirigir('modules/productos/index.php?mensaje=actualizado');
+            
+        } catch (PDOException $e) {
+            $error = 'Error al actualizar: ' . $e->getMessage();
+        }
     }
 }
 ?>
@@ -43,17 +62,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
     <meta charset="UTF-8">
     <title><?php echo traducir('Editar Producto'); ?></title>
-    <link rel="stylesheet" href="../../assets/css/style.css">
-    <link rel="stylesheet" href="../../assets/css/formularios.css">
-    <link rel="stylesheet" href="../../assets/css/mensajes.css">
-    <link rel="stylesheet" href="../../assets/css/footer.css">
+    <link rel="stylesheet" href="<?php echo url('assets/css/style.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/navbar.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/formularios.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/mensajes.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/ui.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/notificaciones.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/footer.css'); ?>">
 </head>
 <body>
     <?php include '../../includes/header.php'; ?>
     <div class="container">
         <div class="page-header">
             <h1><?php echo traducir('Editar Producto'); ?></h1>
-            <a href="index.php" class="btn-secondary">← <?php echo traducir('Volver'); ?></a>
+            <a href="<?php echo url('modules/productos/index.php'); ?>" class="btn-secondary">← <?php echo traducir('Volver'); ?></a>
         </div>
         
         <?php if (isset($error)): ?>
@@ -105,9 +127,46 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <input type="text" name="codigo" value="<?php echo htmlspecialchars($producto['codigo'] ?? ''); ?>">
                 </div>
                 
+                <!-- ===== Costo ===== -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><?php echo $_SESSION['idioma'] == 'pt' ? 'Custo Atual' : 'Costo Actual'; ?></label>
+                        <input type="number" 
+                               name="costo_actual" 
+                               step="0.01" 
+                               min="0"
+                               value="<?php echo $producto['costo_actual'] !== null ? number_format((float)$producto['costo_actual'], 2, '.', '') : ''; ?>"
+                               placeholder="0.00">
+                        <small style="color:#7f8c8d; display:block; margin-top:0.25rem;">
+                            <?php echo $_SESSION['idioma'] == 'pt'
+                                ? 'Preço base do produto. Será usado como padrão em novos projetos.'
+                                : 'Precio base del producto. Se usará como predeterminado en nuevos proyectos.'; ?>
+                            <?php if ($producto['fecha_ultimo_costo']): ?>
+                                <br>
+                                <?php echo $_SESSION['idioma'] == 'pt' ? 'Última atualização' : 'Última actualización'; ?>:
+                                <?php echo formatearFecha($producto['fecha_ultimo_costo']); ?>
+                            <?php endif; ?>
+                        </small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><?php echo traducir('Moneda'); ?></label>
+                        <select name="moneda">
+                            <?php 
+                            $monedas = ['USD', 'BRL', 'EUR', 'ARS', 'PYG', 'UYU'];
+                            $moneda_actual = $producto['moneda'] ?? 'USD';
+                            foreach ($monedas as $m): ?>
+                                <option value="<?php echo $m; ?>" <?php echo $moneda_actual === $m ? 'selected' : ''; ?>>
+                                    <?php echo $m; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+                
                 <div style="display:flex; gap:0.75rem;">
                     <button type="submit" class="btn-primary"><?php echo traducir('Actualizar'); ?></button>
-                    <a href="index.php" class="btn-secondary"><?php echo traducir('Cancelar'); ?></a>
+                    <a href="<?php echo url('modules/productos/index.php'); ?>" class="btn-secondary"><?php echo traducir('Cancelar'); ?></a>
                 </div>
             </form>
         </div>

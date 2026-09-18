@@ -587,24 +587,23 @@ foreach ($items as $it) {
     
 // ===== DROPDOWN REPORTES =====
 function toggleDropdownReportes(e) {
-    if (e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
+    if (e) { e.preventDefault(); e.stopPropagation(); }
     const container = document.querySelector('.dropdown-reportes');
-    const menu = document.getElementById('dropdown-reportes');
-    if (!container || !menu) return;
-    
-    const estaAbierto = container.classList.contains('abierto');
-    
-    // Cerrar cualquier otro dropdown abierto
-    document.querySelectorAll('.dropdown-reportes.abierto').forEach(el => {
-        if (el !== container) el.classList.remove('abierto');
-    });
-    
-    // Toggle
-    container.classList.toggle('abierto', !estaAbierto);
+    if (!container) return;
+    container.classList.toggle('abierto');
 }
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.dropdown-reportes')) {
+        document.querySelectorAll('.dropdown-reportes.abierto').forEach(el => el.classList.remove('abierto'));
+    }
+});
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.dropdown-reportes.abierto').forEach(el => el.classList.remove('abierto'));
+    }
+});
 
 // Cerrar al hacer clic fuera
 document.addEventListener('click', function(e) {
@@ -655,7 +654,6 @@ document.addEventListener('keydown', function(e) {
     }
     </script>
     <script src="<?php echo url('assets/js/modal_productos.js'); ?>"></script>
-    <script src="<?php echo url('assets/js/notificaciones.js'); ?>"></script>
     
     <?php include '../../includes/footer.php'; ?>
 </body>

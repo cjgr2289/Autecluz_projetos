@@ -60,6 +60,10 @@ function obtenerUsuarioPorId($db, $id) {
  * Envía UN SOLO correo a todos los usuarios de compras cuando se agregan
  * uno o más items a un proyecto (agrupado por idioma).
  */
+// ============================================
+// NOTIFICACIÓN 1: Items agregados
+// ============================================
+
 function notificarItemsAgregados($db, $proyecto_id, $items_agregados) {
     if (empty($items_agregados)) return false;
     
@@ -72,22 +76,21 @@ function notificarItemsAgregados($db, $proyecto_id, $items_agregados) {
     
     if (!$proyecto) return false;
     
-    $usuarios_compras = obtenerUsuariosPorTipo($db, 'compras');
-    if (empty($usuarios_compras)) return false;
+    // ✅ Destinatarios: encargado + compras + almacén
+    $destinatarios = obtenerDestinatariosProyecto($db, $proyecto_id);
+    if (empty($destinatarios)) return false;
     
     $mailer = new Mailer();
     $exito_total = true;
     
     // Agrupar por idioma
     $por_idioma = [];
-    foreach ($usuarios_compras as $u) {
+    foreach ($destinatarios as $u) {
         $idioma = $u['idioma_preferido'] ?? 'es';
         $por_idioma[$idioma][] = $u;
     }
     
-    // URL base para los enlaces dentro del correo
-    $base_url = getBaseUrl();
-    $url_proyecto = $base_url . 'modules/proyectos/ver.php?id=' . $proyecto_id;
+    $url_proyecto = getBaseUrl() . 'modules/proyectos/ver.php?id=' . $proyecto_id;
     
     foreach ($por_idioma as $idioma => $usuarios) {
         $html = renderizarPlantilla('item_agregado', [
@@ -114,57 +117,68 @@ function notificarItemsAgregados($db, $proyecto_id, $items_agregados) {
 // NOTIFICACIÓN 2: Cambio de estado de un item
 // ============================================
 
-/**
- * Envía un correo al usuario que creó el proyecto cuando un item cambia de estado.
- */
 function notificarCambioEstadoItem($db, $item_id, $estado_anterior, $estado_nuevo, $usuario_cambio_id, $comentario = '') {
     $stmt = $db->prepare("
         SELECT i.*, 
                p.id as proyecto_id, p.nombre as proyecto_nombre, 
                p.usuario_creacion as solicitante_id,
-               u.nombre_completo as solicitante_nombre, 
-               u.email as solicitante_email,
-               u.idioma_preferido as solicitante_idioma
+               p.encargado_id
         FROM items_proyecto i
         JOIN proyectos p ON i.proyecto_id = p.id
-        LEFT JOIN usuarios u ON p.usuario_creacion = u.id
         WHERE i.id = ?
     ");
     $stmt->execute([$item_id]);
     $item = $stmt->fetch();
     
-    if (!$item || empty($item['solicitante_email'])) return false;
+    if (!$item) return false;
+    
+    // ✅ Destinatarios: encargado + compras + almacén
+    $destinatarios = obtenerDestinatariosProyecto($db, $item['proyecto_id']);
+    if (empty($destinatarios)) return false;
     
     $stmt = $db->prepare("SELECT nombre_completo FROM usuarios WHERE id = ?");
     $stmt->execute([$usuario_cambio_id]);
     $usuario_cambio = $stmt->fetch();
     
-    $idioma = $item['solicitante_idioma'] ?? 'es';
-    $estados_item = getEstadosItemParaIdioma($idioma);
+    $mailer = new Mailer();
+    $exito_total = true;
     
-    // URL del proyecto
+    // Agrupar por idioma
+    $por_idioma = [];
+    foreach ($destinatarios as $u) {
+        $idioma = $u['idioma_preferido'] ?? 'es';
+        $por_idioma[$idioma][] = $u;
+    }
+    
     $url_proyecto = getBaseUrl() . 'modules/proyectos/ver.php?id=' . $item['proyecto_id'];
     
-    $html = renderizarPlantilla('item_estado_cambiado', [
-        'idioma'            => $idioma,
-        'item'              => $item,
-        'estado_anterior'   => $estados_item[$estado_anterior] ?? $estado_anterior,
-        'estado_nuevo'      => $estados_item[$estado_nuevo] ?? $estado_nuevo,
-        'usuario_cambio'    => $usuario_cambio['nombre_completo'] ?? '',
-        'comentario'        => $comentario,
-        'url_proyecto'      => $url_proyecto,
-    ]);
+    foreach ($por_idioma as $idioma => $usuarios) {
+        $estados_item = getEstadosItemParaIdioma($idioma);
+        
+        $html = renderizarPlantilla('item_estado_cambiado', [
+            'idioma'            => $idioma,
+            'item'              => $item,
+            'estado_anterior'   => $estados_item[$estado_anterior] ?? $estado_anterior,
+            'estado_nuevo'      => $estados_item[$estado_nuevo] ?? $estado_nuevo,
+            'usuario_cambio'    => $usuario_cambio['nombre_completo'] ?? '',
+            'comentario'        => $comentario,
+            'url_proyecto'      => $url_proyecto,
+        ]);
+        
+        $asunto = $idioma === 'pt'
+            ? 'Atualização de status do item: ' . $item['nombre_item']
+            : 'Actualización de estado del item: ' . $item['nombre_item'];
+        
+        $emails = array_column($usuarios, 'email');
+        $ok = $mailer->enviar($emails, $asunto, $html);
+        if (!$ok) $exito_total = false;
+    }
     
-    $asunto = $idioma === 'pt'
-        ? 'Atualização de status do item: ' . $item['nombre_item']
-        : 'Actualización de estado del item: ' . $item['nombre_item'];
-    
-    $mailer = new Mailer();
-    return $mailer->enviar($item['solicitante_email'], $asunto, $html);
+    return $exito_total;
 }
 
 /**
- * Devuelve los estados de item en un idioma específico.
+ * Estados de item para un idioma específico (incluye "separado")
  */
 function getEstadosItemParaIdioma($idioma) {
     $estados = [
@@ -172,6 +186,7 @@ function getEstadosItemParaIdioma($idioma) {
             'solicitado'       => 'Solicitado',
             'pendiente'        => 'Pendiente',
             'stock'            => 'En Stock',
+            'separado'         => 'Separado',
             'cotacion'         => 'Cotación',
             'orçado'           => 'Orçado',
             'pendiente_pago'   => 'Pendiente por Pago',
@@ -184,6 +199,7 @@ function getEstadosItemParaIdioma($idioma) {
             'solicitado'       => 'Solicitado',
             'pendiente'        => 'Pendente',
             'stock'            => 'Em Estoque',
+            'separado'         => 'Separado',
             'cotacion'         => 'Cotação',
             'orçado'           => 'Orçado',
             'pendiente_pago'   => 'Pendente de Pagamento',

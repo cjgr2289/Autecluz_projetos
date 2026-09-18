@@ -5,8 +5,7 @@ require_once '../../includes/functions.php';
 verificarSesion();
 
 if (!tienePermiso(['compras', 'directivo', 'gerenciador', 'almacen']) && !esMaster()) {
-    header('Location: ../proyectos/index.php');
-    exit();
+    redirigir('modules/proyectos/index.php');
 }
 
 $db = Database::getInstance()->getConnection();
@@ -14,11 +13,10 @@ $item_id = $_GET['id'] ?? 0;
 $proyecto_id = $_GET['proyecto'] ?? 0;
 
 if (!$item_id || !$proyecto_id) {
-    header('Location: ../proyectos/index.php');
-    exit();
+    redirigir('modules/proyectos/index.php');
 }
 
-$stmt = $db->prepare("SELECT i.*, p.estado as proyecto_estado 
+$stmt = $db->prepare("SELECT i.*, p.estado as proyecto_estado, p.nombre as proyecto_nombre
                       FROM items_proyecto i 
                       JOIN proyectos p ON i.proyecto_id = p.id 
                       WHERE i.id = ?");
@@ -26,109 +24,74 @@ $stmt->execute([$item_id]);
 $item = $stmt->fetch();
 
 if (!$item) {
-    header('Location: ../proyectos/ver.php?id=' . $proyecto_id);
-    exit();
+    redirigir('modules/proyectos/ver.php?id=' . $proyecto_id);
 }
 
 $estados_permitidos = getEstadosItemByProyectoEstado($item['proyecto_estado']);
-
-// ============================================
-// VALIDACIÓN DE TRANSICIONES
-// ============================================
-// Define qué transiciones son válidas desde cada estado.
-// null significa "cualquier estado siguiente permitido" (sin restricción).
-$transiciones_validas = [
-    'solicitado'       => ['pendiente', 'cotacion', 'stock'],
-    'pendiente'        => ['cotacion', 'stock', 'pendiente_pago'],
-    'cotacion'         => ['orçado', 'pendiente_pago', 'stock'],
-    'orçado'           => ['pendiente_pago', 'comprado_llegar', 'stock'],
-    'stock'            => ['pendiente', 'cotacion', 'orçado', 'pendiente_pago', 'comprado_llegar', 'llego', 'entregado'],
-    'pendiente_pago'   => ['comprado_llegar', 'stock', 'llego'],
-    'comprado_llegar'  => ['llego', 'stock', 'entregado'],
-    'llego'            => ['entregado', 'stock', 'recibido'],
-    'entregado'        => ['recibido', 'llego'],  // puede devolverse si hubo error
-    'recibido'         => [],                      // estado final, no se puede cambiar
-];
+$transiciones_validas = getTransicionesValidasItem();
+$siguiente_estado = getSiguienteEstadoSugerido($item['estado']);
 
 /**
- * Valida si una transición de estado es permitida.
- * 
- * @param string $estado_actual
- * @param string $estado_nuevo
- * @return bool
+ * Valida si una transición es permitida
  */
-function esTransicionValida($estado_actual, $estado_nuevo) {
-    global $transiciones_validas;
-    
-    // Mismo estado: no hay transición
-    if ($estado_actual === $estado_nuevo) {
-        return true;
-    }
-    
-    // Si el estado actual no está en el mapa, permitir cualquier transición
-    if (!isset($transiciones_validas[$estado_actual])) {
-        return true;
-    }
-    
-    // Verificar si el nuevo estado está en la lista de permitidos
-    return in_array($estado_nuevo, $transiciones_validas[$estado_actual]);
-}
-
-/**
- * Devuelve el siguiente estado lógico sugerido para un item.
- */
-function getSiguienteEstadoSugerido($estado_actual) {
-    $flujo = [
-        'solicitado'       => 'cotacion',
-        'pendiente'        => 'cotacion',
-        'cotacion'         => 'orçado',
-        'orçado'           => 'pendiente_pago',
-        'stock'            => 'entregado',
-        'pendiente_pago'   => 'comprado_llegar',
-        'comprado_llegar'  => 'llego',
-        'llego'            => 'entregado',
-        'entregado'        => 'recibido',
-        'recibido'         => null,
-    ];
-    
-    return $flujo[$estado_actual] ?? null;
+function esTransicionValida($estado_actual, $estado_nuevo, $transiciones) {
+    if ($estado_actual === $estado_nuevo) return true;
+    if (!isset($transiciones[$estado_actual])) return true;
+    return in_array($estado_nuevo, $transiciones[$estado_actual]);
 }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $nuevo_estado = $_POST['estado'] ?? '';
-    $comentario = $_POST['comentario'] ?? '';
+    $comentario = trim($_POST['comentario'] ?? '');
     $nueva_fecha = $_POST['fecha_requerida'] ?? $item['fecha_requerida'];
     $forzar_transicion = !empty($_POST['forzar_transicion']);
+    $cantidad_stock_nueva = isset($_POST['cantidad_stock']) ? (int)$_POST['cantidad_stock'] : (int)$item['cantidad_stock'];
+    $cantidad_entregada_nueva = isset($_POST['cantidad_entregada']) ? (int)$_POST['cantidad_entregada'] : (int)$item['cantidad_entregada'];
     
-    // Validar que el estado esté permitido por el proyecto
+    $errores = [];
+    
     if (!isset($estados_permitidos[$nuevo_estado])) {
-        $error = 'Estado no permitido para este proyecto';
+        $errores[] = 'Estado no permitido para este proyecto';
     }
-    // Validar transición
-    elseif (!esTransicionValida($item['estado'], $nuevo_estado) && !$forzar_transicion) {
-        $siguiente = getSiguienteEstadoSugerido($item['estado']);
-        $error = 'La transición de "' . $estados_permitidos[$item['estado']] . '" a "' 
-               . ($estados_permitidos[$nuevo_estado] ?? $nuevo_estado) . '" no es válida.';
-        if ($siguiente) {
-            $error .= ' Estado sugerido: ' . $estados_permitidos[$siguiente];
+    
+    if (!esTransicionValida($item['estado'], $nuevo_estado, $transiciones_validas) && !$forzar_transicion) {
+        $errores[] = 'La transición no es válida. Marca "Forzar transición" si estás seguro.';
+    }
+    
+    // Validar cantidad_stock si el estado es "stock"
+    if ($nuevo_estado === 'stock') {
+        if ($cantidad_stock_nueva < 0 || $cantidad_stock_nueva > $item['cantidad']) {
+            $errores[] = 'La cantidad en stock debe estar entre 0 y ' . $item['cantidad'];
         }
-        $error .= ' Si estás seguro, marca la casilla "Forzar transición".';
-    } 
-    else {
+    }
+    
+    // Validar cantidad_entregada si el estado es "entregado"
+    if ($nuevo_estado === 'entregado') {
+        if ($cantidad_entregada_nueva < 1 || $cantidad_entregada_nueva > $item['cantidad_stock']) {
+            $errores[] = 'La cantidad a entregar debe estar entre 1 y ' . $item['cantidad_stock'];
+        }
+    }
+    
+    if (empty($errores)) {
         try {
-            $estado_anterior = $item['estado'];
-            
             $db->beginTransaction();
+            
+            $estado_anterior = $item['estado'];
             
             // Guardar en historial
             $stmt = $db->prepare("
                 INSERT INTO historial_items 
                     (item_id, estado_anterior, estado_nuevo, 
-                     fecha_anterior, fecha_nueva, usuario_id, comentario)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                     fecha_anterior, fecha_nueva, 
+                     cantidad_anterior, cantidad_nueva,
+                     cantidad_stock_anterior, cantidad_stock_nueva,
+                     cantidad_entregada_anterior, cantidad_entregada_nueva,
+                     usuario_id, comentario)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
+            
             $comentario_final = $comentario;
-            if (!esTransicionValida($estado_anterior, $nuevo_estado) && $forzar_transicion) {
+            if (!esTransicionValida($estado_anterior, $nuevo_estado, $transiciones_validas) && $forzar_transicion) {
                 $comentario_final = '[TRANSICIÓN FORZADA] ' . $comentario;
             }
             
@@ -138,6 +101,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $nuevo_estado,
                 $item['fecha_requerida'],
                 $nueva_fecha,
+                $item['cantidad'],
+                $item['cantidad'],
+                $item['cantidad_stock'],
+                $cantidad_stock_nueva,
+                $item['cantidad_entregada'],
+                $cantidad_entregada_nueva,
                 $_SESSION['usuario_id'],
                 $comentario_final
             ]);
@@ -145,33 +114,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             // Actualizar item
             $stmt = $db->prepare("
                 UPDATE items_proyecto 
-                SET estado = ?, fecha_requerida = ? 
+                SET estado = ?, 
+                    fecha_requerida = ?,
+                    cantidad_stock = ?,
+                    cantidad_entregada = ?
                 WHERE id = ?
             ");
-            $stmt->execute([$nuevo_estado, $nueva_fecha, $item_id]);
-            
-            // Actualizar columnas de trazabilidad si existen
-            // (entrega y recepción)
-            try {
-                if ($nuevo_estado === 'entregado' && $estado_anterior !== 'entregado') {
-                    $stmt = $db->prepare("UPDATE items_proyecto 
-                                          SET entregado_por = ?, fecha_entrega = NOW() 
-                                          WHERE id = ?");
-                    $stmt->execute([$_SESSION['usuario_id'], $item_id]);
-                }
-                if ($nuevo_estado === 'recibido' && $estado_anterior !== 'recibido') {
-                    $stmt = $db->prepare("UPDATE items_proyecto 
-                                          SET recibido_por = ?, fecha_recepcion = NOW() 
-                                          WHERE id = ?");
-                    $stmt->execute([$_SESSION['usuario_id'], $item_id]);
-                }
-            } catch (PDOException $e) {
-                // Las columnas pueden no existir, ignorar silenciosamente
-            }
+            $stmt->execute([
+                $nuevo_estado, 
+                $nueva_fecha, 
+                $cantidad_stock_nueva,
+                $cantidad_entregada_nueva,
+                $item_id
+            ]);
             
             $db->commit();
             
-            // Notificar al solicitante si el estado cambió
+            // Notificar a los destinatarios
             if ($estado_anterior !== $nuevo_estado) {
                 try {
                     notificarCambioEstadoItem(
@@ -187,31 +146,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
             }
             
-            // Guardar toast pendiente para mostrar tras la redirección
-            $estado_label = $estados_permitidos[$nuevo_estado] ?? $nuevo_estado;
-            $msg = $_SESSION['idioma'] == 'pt'
-                ? "Status alterado para: $estado_label"
-                : "Estado actualizado a: $estado_label";
+            redirigir('modules/proyectos/ver.php?id=' . $proyecto_id . '&mensaje=actualizado');
             
-            // Redirigir con mensaje de éxito
-            header('Location: ../proyectos/ver.php?id=' . $proyecto_id . '&mensaje=actualizado');
-            exit();
         } catch (PDOException $e) {
             $db->rollBack();
-            $error = 'Error al actualizar: ' . $e->getMessage();
+            $errores[] = 'Error al actualizar: ' . $e->getMessage();
         }
     }
 }
-
-$estados_item = getEstadosItem();
-$siguiente_estado = getSiguienteEstadoSugerido($item['estado']);
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo $_SESSION['idioma'] ?? 'es'; ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo traducir('Actualizar Estado'); ?> - <?php echo htmlspecialchars($item['nombre_item']); ?></title>
+    <title><?php echo traducir('Actualizar Estado'); ?></title>
     <link rel="stylesheet" href="<?php echo url('assets/css/style.css'); ?>">
     <link rel="stylesheet" href="<?php echo url('assets/css/navbar.css'); ?>">
     <link rel="stylesheet" href="<?php echo url('assets/css/formularios.css'); ?>">
@@ -227,38 +176,64 @@ $siguiente_estado = getSiguienteEstadoSugerido($item['estado']);
     <div class="container">
         <div class="page-header">
             <h1><?php echo traducir('Actualizar Estado'); ?></h1>
-            <a href="../proyectos/ver.php?id=<?php echo $proyecto_id; ?>" class="btn-secondary">
+            <a href="<?php echo url('modules/proyectos/ver.php?id=' . $proyecto_id); ?>" class="btn-secondary">
                 ← <?php echo traducir('Volver'); ?>
             </a>
         </div>
         
         <div class="form-container">
-            <!-- Info del item -->
             <div class="info-message" style="margin-bottom:1.5rem;">
                 <h3 style="margin:0 0 0.5rem 0;"><?php echo htmlspecialchars($item['nombre_item']); ?></h3>
                 <p style="margin:0; font-size:0.9rem;">
-                    <strong><?php echo traducir('Estado'); ?>:</strong> 
+                    <strong><?php echo traducir('Proyecto'); ?>:</strong>
+                    <?php echo htmlspecialchars($item['proyecto_nombre']); ?>
+                </p>
+                <p style="margin:0.5rem 0 0 0; font-size:0.9rem;">
+                    <strong><?php echo traducir('Estado actual'); ?>:</strong> 
                     <span class="estado-badge estado-<?php echo $item['estado']; ?>">
-                        <?php echo $estados_item[$item['estado']] ?? $item['estado']; ?>
+                        <?php echo getEstadosItem()[$item['estado']] ?? $item['estado']; ?>
                     </span>
                     <?php if ($siguiente_estado): ?>
                         <span style="margin-left:1rem; color:#7f8c8d; font-size:0.85rem;">
-                            → <?php echo $_SESSION['idioma'] == 'pt' ? 'Sugerido' : 'Sugerido'; ?>:
-                            <strong><?php echo $estados_item[$siguiente_estado] ?? $siguiente_estado; ?></strong>
+                            → <?php echo traducir('Sugerido'); ?>:
+                            <strong><?php echo getEstadosItem()[$siguiente_estado] ?? $siguiente_estado; ?></strong>
                         </span>
+                    <?php endif; ?>
+                </p>
+                <p style="margin:0.5rem 0 0 0; font-size:0.9rem;">
+                    <strong><?php echo traducir('Cantidad solicitada'); ?>:</strong>
+                    <?php echo $item['cantidad']; ?>
+                    <?php if ($item['cantidad_stock'] > 0): ?>
+                        &nbsp;|&nbsp;
+                        <strong><?php echo traducir('En Stock'); ?>:</strong>
+                        <span style="color:#27ae60; font-weight:bold;"><?php echo $item['cantidad_stock']; ?></span>
+                        <?php if ($item['cantidad_stock'] < $item['cantidad']): ?>
+                            &nbsp;|&nbsp;
+                            <strong><?php echo traducir('Falta'); ?>:</strong>
+                            <span style="color:#e74c3c; font-weight:bold;"><?php echo $item['cantidad'] - $item['cantidad_stock']; ?></span>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                    <?php if ($item['cantidad_entregada'] > 0): ?>
+                        &nbsp;|&nbsp;
+                        <strong><?php echo traducir('Entregado'); ?>:</strong>
+                        <span style="color:#3498db; font-weight:bold;"><?php echo $item['cantidad_entregada']; ?></span>
                     <?php endif; ?>
                 </p>
             </div>
             
-            <?php if (isset($error)): ?>
+            <?php if (!empty($errores)): ?>
                 <div class="error-message">
-                    <strong>⚠</strong> <?php echo htmlspecialchars($error); ?>
+                    <ul style="margin: 0.5rem 0 0 1.5rem;">
+                        <?php foreach ($errores as $err): ?>
+                            <li><?php echo htmlspecialchars($err); ?></li>
+                        <?php endforeach; ?>
+                    </ul>
                 </div>
             <?php endif; ?>
             
             <form method="POST" action="" id="form-estado">
                 <div class="form-group">
-                    <label for="estado"><?php echo traducir('Estado'); ?> *</label>
+                    <label for="estado"><?php echo traducir('Nuevo Estado'); ?> *</label>
                     <select id="estado" name="estado" required>
                         <option value="">-- <?php echo traducir('Seleccionar'); ?> --</option>
                         <?php foreach ($estados_permitidos as $key => $value): 
@@ -267,31 +242,60 @@ $siguiente_estado = getSiguienteEstadoSugerido($item['estado']);
                         ?>
                             <option value="<?php echo $key; ?>" 
                                     data-es-sugerido="<?php echo $es_sugerido ? '1' : '0'; ?>"
-                                    data-es-actual="<?php echo $es_actual ? '1' : '0'; ?>"
                                     <?php echo $es_sugerido ? 'style="font-weight:bold;"' : ''; ?>>
                                 <?php echo $value; ?>
                                 <?php if ($es_sugerido): ?> ⭐<?php endif; ?>
-                                <?php if ($es_actual): ?> (<?php echo $_SESSION['idioma'] == 'pt' ? 'atual' : 'actual'; ?>)<?php endif; ?>
+                                <?php if ($es_actual): ?> (<?php echo traducir('actual'); ?>)<?php endif; ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
+                </div>
+                
+                <!-- Cantidad en Stock (solo si cambia a "stock") -->
+                <div class="form-group" id="grupo-stock" style="display:none;">
+                    <label for="cantidad_stock">
+                        <?php echo traducir('Cantidad en Stock'); ?>
+                    </label>
+                    <input type="number" 
+                           id="cantidad_stock" 
+                           name="cantidad_stock" 
+                           value="<?php echo $item['cantidad_stock'] > 0 ? $item['cantidad_stock'] : $item['cantidad']; ?>" 
+                           min="0" 
+                           max="<?php echo $item['cantidad']; ?>"
+                           step="1">
                     <small style="color:#7f8c8d; display:block; margin-top:0.25rem;">
-                        <?php echo $_SESSION['idioma'] == 'pt'
-                            ? 'Estados com ⭐ são o próximo passo lógico.'
-                            : 'Los estados con ⭐ son el siguiente paso lógico.'; ?>
+                        <?php echo traducir('Cantidad disponible'); ?>: 
+                        máximo <?php echo $item['cantidad']; ?>.
+                        <?php echo traducir('Si es menor, el resto quedará como'); ?> 
+                        <em><?php echo traducir('Falta por comprar'); ?></em>.
                     </small>
                 </div>
                 
-                <!-- Advertencia de transición (oculta por defecto) -->
+                <!-- Cantidad a Entregar (solo si cambia a "entregado") -->
+                <div class="form-group" id="grupo-entrega" style="display:none;">
+                    <label for="cantidad_entregada">
+                        <?php echo traducir('Cantidad a entregar'); ?>
+                    </label>
+                    <input type="number" 
+                           id="cantidad_entregada" 
+                           name="cantidad_entregada" 
+                           value="<?php echo $item['cantidad_stock'] > 0 ? $item['cantidad_stock'] : $item['cantidad']; ?>" 
+                           min="1" 
+                           max="<?php echo $item['cantidad_stock'] > 0 ? $item['cantidad_stock'] : $item['cantidad']; ?>"
+                           step="1">
+                    <small style="color:#7f8c8d; display:block; margin-top:0.25rem;">
+                        <?php echo traducir('Entrega parcial'); ?>: 
+                        puedes entregar menos de lo disponible.
+                    </small>
+                </div>
+                
                 <div id="aviso-transicion" style="display:none; margin-bottom:1rem; padding:0.85rem 1rem; background:#fff3cd; border-left:4px solid #f39c12; border-radius:4px; font-size:0.88rem;">
-                    <strong>⚠ <?php echo $_SESSION['idioma'] == 'pt' ? 'Atenção:' : 'Atención:'; ?></strong>
+                    <strong>⚠ <?php echo traducir('Atención'); ?>:</strong>
                     <span id="aviso-transicion-texto"></span>
                     <div style="margin-top:0.5rem;">
                         <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
                             <input type="checkbox" name="forzar_transicion" id="forzar_transicion" value="1">
-                            <?php echo $_SESSION['idioma'] == 'pt' 
-                                ? 'Forçar transição (estou ciente de que esta transição pode não ser ideal)'
-                                : 'Forzar transición (estoy consciente de que esta transición puede no ser ideal)'; ?>
+                            <?php echo traducir('Forzar transición'); ?>
                         </label>
                     </div>
                 </div>
@@ -304,15 +308,14 @@ $siguiente_estado = getSiguienteEstadoSugerido($item['estado']);
                 
                 <div class="form-group">
                     <label for="comentario"><?php echo traducir('Comentario'); ?></label>
-                    <textarea id="comentario" name="comentario" rows="3"
-                              placeholder="<?php echo $_SESSION['idioma'] == 'pt' ? 'Observações sobre a mudança...' : 'Observaciones sobre el cambio...'; ?>"></textarea>
+                    <textarea id="comentario" name="comentario" rows="3"></textarea>
                 </div>
                 
                 <div style="display:flex; gap:0.75rem;">
                     <button type="submit" class="btn-primary">
                         💾 <?php echo traducir('Actualizar'); ?>
                     </button>
-                    <a href="../proyectos/ver.php?id=<?php echo $proyecto_id; ?>" class="btn-secondary">
+                    <a href="<?php echo url('modules/proyectos/ver.php?id=' . $proyecto_id); ?>" class="btn-secondary">
                         <?php echo traducir('Cancelar'); ?>
                     </a>
                 </div>
@@ -321,73 +324,48 @@ $siguiente_estado = getSiguienteEstadoSugerido($item['estado']);
     </div>
     
     <script>
-    // Transiciones válidas (duplicadas del PHP para validación cliente)
     const TRANSICIONES_VALIDAS = <?php echo json_encode($transiciones_validas); ?>;
-    const ESTADOS_LABELS = <?php echo json_encode($estados_item); ?>;
     const ESTADO_ACTUAL = '<?php echo $item['estado']; ?>';
     const IDIOMA = '<?php echo $_SESSION['idioma']; ?>';
     
     const selectEstado = document.getElementById('estado');
     const aviso = document.getElementById('aviso-transicion');
     const avisoTexto = document.getElementById('aviso-transicion-texto');
+    const grupoStock = document.getElementById('grupo-stock');
+    const grupoEntrega = document.getElementById('grupo-entrega');
     
-    function validarTransicion() {
+    function validarEstado() {
         const nuevoEstado = selectEstado.value;
         
-        // Sin cambio o sin estado: ocultar
+        // Mostrar/ocultar campos según el estado
+        grupoStock.style.display = (nuevoEstado === 'stock') ? 'block' : 'none';
+        grupoEntrega.style.display = (nuevoEstado === 'entregado') ? 'block' : 'none';
+        
+        // Validar transición
         if (!nuevoEstado || nuevoEstado === ESTADO_ACTUAL) {
             aviso.style.display = 'none';
             return;
         }
         
-        // Verificar si es válida
         const validas = TRANSICIONES_VALIDAS[ESTADO_ACTUAL] || [];
         const esValida = validas.includes(nuevoEstado);
         
+        aviso.style.display = esValida ? 'none' : 'block';
+        
         if (!esValida) {
-            const labelActual = ESTADOS_LABELS[ESTADO_ACTUAL] || ESTADO_ACTUAL;
-            const labelNuevo = ESTADOS_LABELS[nuevoEstado] || nuevoEstado;
-            
             avisoTexto.textContent = IDIOMA === 'pt'
-                ? `A transição de "${labelActual}" para "${labelNuevo}" não segue o fluxo normal.`
-                : `La transición de "${labelActual}" a "${labelNuevo}" no sigue el flujo normal.`;
-            
-            aviso.style.display = 'block';
-        } else {
-            aviso.style.display = 'none';
+                ? 'Esta transição não segue o fluxo normal.'
+                : 'Esta transición no sigue el flujo normal.';
         }
     }
     
     if (selectEstado) {
-        selectEstado.addEventListener('change', validarTransicion);
-        validarTransicion(); // Verificar al cargar
+        selectEstado.addEventListener('change', validarEstado);
+        validarEstado();
     }
-    
-    // Validar al enviar
-    document.getElementById('form-estado').addEventListener('submit', function(e) {
-        const nuevoEstado = selectEstado.value;
-        
-        if (!nuevoEstado) {
-            e.preventDefault();
-            alert(IDIOMA === 'pt' ? 'Selecione um estado.' : 'Seleccione un estado.');
-            return;
-        }
-        
-        // Si la transición no es válida y no se forzó, avisar
-        const validas = TRANSICIONES_VALIDAS[ESTADO_ACTUAL] || [];
-        const esValida = nuevoEstado === ESTADO_ACTUAL || validas.includes(nuevoEstado);
-        const forzar = document.getElementById('forzar_transicion');
-        
-        if (!esValida && (!forzar || !forzar.checked)) {
-            e.preventDefault();
-            alert(IDIOMA === 'pt'
-                ? 'A transição não é válida. Marque "Forçar transição" para continuar.'
-                : 'La transición no es válida. Marque "Forzar transición" para continuar.');
-        }
-    });
     </script>
     
-    <script src="<?php echo url('assets/js/notificaciones.js'); ?>"></script>
+
     
     <?php include '../../includes/footer.php'; ?>
 </body>

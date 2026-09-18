@@ -6,7 +6,7 @@ verificarSesion();
 
 header('Content-Type: application/json');
 
-if (!tienePermiso(['compras', 'directivo', 'gerenciador', 'supervisor', 'proyectista']) && !esMaster()) {
+if (!tienePermiso(['compras', 'directivo', 'gerenciador', 'supervisor', 'proyectista', 'almacen']) && !esMaster()) {
     echo json_encode(['success' => false, 'error' => 'Sin permisos']);
     exit();
 }
@@ -22,7 +22,6 @@ if (!$proyecto_id || empty($items)) {
 
 $db = Database::getInstance()->getConnection();
 
-// Verificar proyecto
 $stmt = $db->prepare("SELECT estado FROM proyectos WHERE id = ?");
 $stmt->execute([$proyecto_id]);
 $proyecto = $stmt->fetch();
@@ -46,12 +45,14 @@ try {
     
     $stmt_insert = $db->prepare("INSERT INTO items_proyecto 
                                  (proyecto_id, producto_id, nombre_item, cantidad, unidad_medida, 
-                                  especificaciones, fecha_requerida, estado)
-                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                                  especificaciones, fecha_requerida, estado,
+                                  costo_unitario, moneda)
+                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt_historial = $db->prepare("INSERT INTO historial_items 
                                     (item_id, estado_anterior, estado_nuevo, fecha_anterior, fecha_nueva, 
                                      cantidad_anterior, cantidad_nueva, usuario_id, comentario)
                                     VALUES (?, NULL, ?, NULL, ?, NULL, ?, ?, ?)");
+    $stmt_producto = $db->prepare("SELECT costo_actual, moneda FROM productos WHERE id = ?");
     
     foreach ($items as $item) {
         $nombre = trim($item['nombre_item'] ?? '');
@@ -71,9 +72,23 @@ try {
             continue;
         }
         
+        // Heredar costo del producto
+        $costo_unitario = null;
+        $moneda = 'USD';
+        
+        if ($producto_id) {
+            $stmt_producto->execute([$producto_id]);
+            $prod = $stmt_producto->fetch();
+            if ($prod && $prod['costo_actual'] !== null) {
+                $costo_unitario = $prod['costo_actual'];
+                $moneda = $prod['moneda'] ?? 'USD';
+            }
+        }
+        
         $stmt_insert->execute([
             $proyecto_id, $producto_id ?: null, $nombre, $cantidad,
-            $unidad, $espec, $fecha, $estado_inicial
+            $unidad, $espec, $fecha, $estado_inicial,
+            $costo_unitario, $moneda
         ]);
         
         $item_id = $db->lastInsertId();
@@ -95,12 +110,11 @@ try {
     
     $db->commit();
     
-    // ENVIAR UN SOLO CORREO CON TODOS LOS ITEMS
     if (!empty($items_guardados)) {
         try {
             notificarItemsAgregados($db, $proyecto_id, $items_guardados);
         } catch (Exception $e) {
-            error_log("Error al enviar email de items agregados: " . $e->getMessage());
+            error_log("Error al enviar email: " . $e->getMessage());
         }
     }
     

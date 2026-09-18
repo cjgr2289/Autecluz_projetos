@@ -4,9 +4,6 @@
  * Catálogos de estados para proyectos e items
  */
 
-/**
- * Devuelve los estados posibles de un proyecto (traducidos según idioma)
- */
 function getEstadosProyecto() {
     $idioma = $_SESSION['idioma'] ?? 'es';
     
@@ -41,7 +38,7 @@ function getEstadosProyecto() {
 }
 
 /**
- * Devuelve los estados posibles de un item (traducidos según idioma)
+ * Estados de un item, incluyendo "separado"
  */
 function getEstadosItem() {
     $idioma = $_SESSION['idioma'] ?? 'es';
@@ -51,6 +48,7 @@ function getEstadosItem() {
             'solicitado'       => 'Solicitado',
             'pendiente'        => 'Pendiente',
             'stock'            => 'En Stock',
+            'separado'         => 'Separado',
             'cotacion'         => 'Cotación',
             'orçado'           => 'Orçado',
             'pendiente_pago'   => 'Pendiente por Pago',
@@ -63,6 +61,7 @@ function getEstadosItem() {
             'solicitado'       => 'Solicitado',
             'pendiente'        => 'Pendente',
             'stock'            => 'Em Estoque',
+            'separado'         => 'Separado',
             'cotacion'         => 'Cotação',
             'orçado'           => 'Orçado',
             'pendiente_pago'   => 'Pendente de Pagamento',
@@ -77,18 +76,15 @@ function getEstadosItem() {
 }
 
 /**
- * Devuelve los estados permitidos para un item según el estado del proyecto.
- * Aplica las reglas de negocio automáticas.
+ * Estados permitidos según el estado del proyecto
  */
 function getEstadosItemByProyectoEstado($proyecto_estado) {
     $estados_permitidos = getEstadosItem();
     
-    // Si el proyecto está en orçado o pendiente aprobación → solo "solicitado"
     if (in_array($proyecto_estado, ['orçado', 'pendente_aprovacion_cliente'])) {
         return ['solicitado' => $estados_permitidos['solicitado']];
     }
     
-    // Si el proyecto está aprobado o más adelante → todos menos "pendiente" (es automático)
     if (in_array($proyecto_estado, ['aprovado_cliente', 'espera_orden_compra', 'comprando_materiales',
                                      'elaboracion', 'terminado', 'pendiente_cobro_cliente', 'finalizado'])) {
         unset($estados_permitidos['pendiente']);
@@ -96,4 +92,44 @@ function getEstadosItemByProyectoEstado($proyecto_estado) {
     }
     
     return $estados_permitidos;
+}
+
+/**
+ * Transiciones válidas de estado para items
+ */
+function getTransicionesValidasItem() {
+    return [
+        'solicitado'       => ['pendiente', 'cotacion', 'stock'],
+        'pendiente'        => ['cotacion', 'stock', 'pendiente_pago'],
+        'cotacion'         => ['orçado', 'pendiente_pago', 'stock'],
+        'orçado'           => ['pendiente_pago', 'comprado_llegar', 'stock'],
+        'stock'            => ['separado', 'pendiente_pago', 'comprado_llegar', 'cotacion'],
+        'separado'         => ['entregado', 'stock'],  // puede devolverse a stock
+        'pendiente_pago'   => ['comprado_llegar', 'stock', 'llego'],
+        'comprado_llegar'  => ['llego', 'stock', 'separado'],
+        'llego'            => ['separado', 'stock', 'entregado'],
+        'entregado'        => ['recibido', 'separado'],
+        'recibido'         => [],
+    ];
+}
+
+/**
+ * Devuelve el siguiente estado lógico sugerido
+ */
+function getSiguienteEstadoSugerido($estado_actual) {
+    $flujo = [
+        'solicitado'       => 'cotacion',
+        'pendiente'        => 'cotacion',
+        'cotacion'         => 'orçado',
+        'orçado'           => 'pendiente_pago',
+        'stock'            => 'separado',
+        'separado'         => 'entregado',
+        'pendiente_pago'   => 'comprado_llegar',
+        'comprado_llegar'  => 'llego',
+        'llego'            => 'separado',
+        'entregado'        => 'recibido',
+        'recibido'         => null,
+    ];
+    
+    return $flujo[$estado_actual] ?? null;
 }

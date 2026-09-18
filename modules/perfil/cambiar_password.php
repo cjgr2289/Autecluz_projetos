@@ -307,8 +307,6 @@ $mensaje = $_GET['mensaje'] ?? '';
     }
     </script>
     
-    <script src="<?php echo url('assets/js/notificaciones.js'); ?>"></script>
-    
     <?php include '../../includes/footer.php'; ?>
 </body>
 </html>

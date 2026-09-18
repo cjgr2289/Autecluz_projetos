@@ -14,6 +14,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $categoria_id = $_POST['categoria_id'] ?? null;
     $unidad_medida = $_POST['unidad_medida'] ?? '';
     $codigo = $_POST['codigo'] ?? '';
+    $costo_actual = !empty($_POST['costo_actual']) ? (float)$_POST['costo_actual'] : null;
+    $moneda = $_POST['moneda'] ?? 'USD';
     
     if (empty($nombre)) {
         $error = 'El nombre es obligatorio';
@@ -21,11 +23,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $error = 'Unidad de medida no válida';
     } else {
         try {
-            $stmt = $db->prepare("INSERT INTO productos (nombre, descripcion, categoria_id, unidad_medida, codigo, usuario_creacion)
-                                 VALUES (?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$nombre, $descripcion, $categoria_id ?: null, $unidad_medida, $codigo, $_SESSION['usuario_id']]);
+            $stmt = $db->prepare("INSERT INTO productos 
+                                  (nombre, descripcion, categoria_id, unidad_medida, codigo, 
+                                   costo_actual, moneda, fecha_ultimo_costo, usuario_creacion)
+                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([
+                $nombre, 
+                $descripcion, 
+                $categoria_id ?: null, 
+                $unidad_medida, 
+                $codigo, 
+                $costo_actual, 
+                $moneda,
+                $costo_actual ? date('Y-m-d') : null,
+                $_SESSION['usuario_id']
+            ]);
             
-            $redirect = $_POST['redirect'] ?? 'index.php';
+            $redirect = $_POST['redirect'] ?? url('modules/productos/index.php');
             header("Location: $redirect?mensaje=creado");
             exit();
         } catch (PDOException $e) {
@@ -34,17 +48,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-$redirect = $_GET['redirect'] ?? 'index.php';
+$redirect = $_GET['redirect'] ?? url('modules/productos/index.php');
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo $_SESSION['idioma'] ?? 'es'; ?>">
 <head>
     <meta charset="UTF-8">
     <title><?php echo traducir('Crear Producto'); ?></title>
-    <link rel="stylesheet" href="../../assets/css/style.css">
-    <link rel="stylesheet" href="../../assets/css/formularios.css">
-    <link rel="stylesheet" href="../../assets/css/mensajes.css">
-    <link rel="stylesheet" href="../../assets/css/footer.css">
+    <link rel="stylesheet" href="<?php echo url('assets/css/style.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/navbar.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/formularios.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/mensajes.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/ui.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/notificaciones.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/footer.css'); ?>">
 </head>
 <body>
     <?php include '../../includes/header.php'; ?>
@@ -101,7 +118,39 @@ $redirect = $_GET['redirect'] ?? 'index.php';
                     <input type="text" name="codigo">
                 </div>
                 
-                <button type="submit" class="btn-primary"><?php echo traducir('Guardar'); ?></button>
+                <!-- ===== NUEVO: Costo ===== -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><?php echo $_SESSION['idioma'] == 'pt' ? 'Custo Atual' : 'Costo Actual'; ?></label>
+                        <input type="number" 
+                               name="costo_actual" 
+                               step="0.01" 
+                               min="0"
+                               placeholder="0.00">
+                        <small style="color:#7f8c8d; display:block; margin-top:0.25rem;">
+                            <?php echo $_SESSION['idioma'] == 'pt'
+                                ? 'Preço base do produto. Será usado como padrão em novos projetos.'
+                                : 'Precio base del producto. Se usará como predeterminado en nuevos proyectos.'; ?>
+                        </small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><?php echo traducir('Moneda'); ?></label>
+                        <select name="moneda">
+                            <option value="USD">USD - Dólar</option>
+                            <option value="BRL">BRL - Real Brasileño</option>
+                            <option value="EUR">EUR - Euro</option>
+                            <option value="ARS">ARS - Peso Argentino</option>
+                            <option value="PYG">PYG - Guaraní</option>
+                            <option value="UYU">UYU - Peso Uruguayo</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div style="display:flex; gap:0.75rem;">
+                    <button type="submit" class="btn-primary"><?php echo traducir('Guardar'); ?></button>
+                    <a href="<?php echo htmlspecialchars($redirect); ?>" class="btn-secondary"><?php echo traducir('Cancelar'); ?></a>
+                </div>
             </form>
         </div>
     </div>

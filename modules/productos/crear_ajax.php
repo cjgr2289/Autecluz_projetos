@@ -13,27 +13,33 @@ $categoria_id = $_POST['categoria_id'] ?? null;
 $unidad_medida = $_POST['unidad_medida'] ?? '';
 $codigo = $_POST['codigo'] ?? '';
 $descripcion = $_POST['descripcion'] ?? '';
+$costo_actual = !empty($_POST['costo_actual']) ? (float)$_POST['costo_actual'] : null;
+$moneda = $_POST['moneda'] ?? 'USD';
 
 if (empty($nombre)) {
     echo json_encode(['success' => false, 'error' => 'El nombre es obligatorio']);
     exit();
 }
 
-// Validar unidad
 if (!empty($unidad_medida) && !esUnidadValida($unidad_medida)) {
     echo json_encode(['success' => false, 'error' => 'Unidad de medida no válida']);
     exit();
 }
 
 try {
-    $stmt = $db->prepare("INSERT INTO productos (nombre, descripcion, categoria_id, unidad_medida, codigo, usuario_creacion)
-                         VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt = $db->prepare("INSERT INTO productos 
+                          (nombre, descripcion, categoria_id, unidad_medida, codigo, 
+                           costo_actual, moneda, fecha_ultimo_costo, usuario_creacion)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->execute([
         $nombre, 
         $descripcion, 
         $categoria_id ?: null, 
         $unidad_medida, 
-        $codigo, 
+        $codigo,
+        $costo_actual,
+        $moneda,
+        $costo_actual ? date('Y-m-d') : null,
         $_SESSION['usuario_id']
     ]);
     
@@ -46,7 +52,6 @@ try {
     $stmt->execute([$id]);
     $producto = $stmt->fetch();
     
-    // Agregar etiqueta de unidad formateada para mostrarla en el modal
     $producto['unidad_label'] = getUnidadLabel($producto['unidad_medida']);
     
     echo json_encode(['success' => true, 'producto' => $producto]);
