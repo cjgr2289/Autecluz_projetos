@@ -1,0 +1,419 @@
+/* assets/css/propuestas.css
+   Estilos para propuestas económicas
+   ============================================ */
+
+/* ===== Encabezado institucional ===== */
+.propuesta-header-institucional {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 3px solid #0d47a1;
+    margin-bottom: 1.5rem;
+}
+
+.propuesta-empresa {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.propuesta-logo svg {
+    display: block;
+}
+
+.propuesta-empresa-nombre {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #0d47a1;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.2rem;
+}
+
+.propuesta-empresa-info {
+    font-size: 0.72rem;
+    color: #7f8c8d;
+    line-height: 1.4;
+}
+
+.propuesta-doc-datos {
+    text-align: right;
+}
+
+.propuesta-doc-titulo {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #0d47a1;
+    letter-spacing: 1px;
+    margin-bottom: 0.25rem;
+}
+
+.propuesta-doc-numero {
+    font-size: 0.9rem;
+    color: #c0392b;
+    font-weight: 700;
+    font-family: monospace;
+    margin-bottom: 0.15rem;
+}
+
+.propuesta-doc-fecha {
+    font-size: 0.8rem;
+    color: #7f8c8d;
+}
+
+/* ===== Info en tarjetas ===== */
+.propuesta-info-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+
+.propuesta-info-card {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-left: 3px solid #0d47a1;
+    border-radius: 4px;
+    padding: 0.65rem 0.85rem;
+}
+
+.propuesta-info-label {
+    font-size: 0.65rem;
+    color: #7f8c8d;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    margin-bottom: 0.2rem;
+}
+
+.propuesta-info-value {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #2c3e50;
+    word-break: break-word;
+}
+
+/* ===== Descripción ===== */
+.propuesta-descripcion {
+    background: #f8f9fa;
+    border-left: 3px solid #3498db;
+    padding: 0.75rem 1rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: #555;
+    line-height: 1.5;
+    margin-bottom: 1.25rem;
+}
+
+/* ===== Título de sección ===== */
+.propuesta-seccion-titulo {
+    font-size: 1rem;
+    color: #0d47a1;
+    padding: 0.5rem 0;
+    margin: 1.5rem 0 0.75rem 0;
+    border-bottom: 2px solid #0d47a1;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ===== Tabla de propuesta ===== */
+.propuesta-tabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    margin-bottom: 1rem;
+    border: 1px solid #dee2e6;
+}
+
+.propuesta-tabla th {
+    background: #0d47a1;
+    color: white;
+    padding: 0.55rem 0.5rem;
+    text-align: left;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    border: 1px solid #0d47a1;
+}
+
+.propuesta-tabla td {
+    padding: 0.5rem;
+    border: 1px solid #dee2e6;
+    vertical-align: middle;
+}
+
+.propuesta-tabla tbody tr:nth-child(even) {
+    background: #f8f9fa;
+}
+
+.propuesta-tabla tbody tr:hover {
+    background: #eef2f5;
+}
+
+/* ===== Resumen financiero ===== */
+.propuesta-resumen {
+    background: #f8f9fa;
+    border: 2px solid #0d47a1;
+    border-radius: 6px;
+    padding: 1rem 1.5rem;
+    margin-top: 1rem;
+}
+
+.propuesta-resumen-linea {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    font-size: 0.9rem;
+    border-bottom: 1px dashed #dee2e6;
+}
+
+.propuesta-resumen-linea:last-child {
+    border-bottom: none;
+}
+
+.propuesta-resumen-linea.subtotal {
+    font-weight: 700;
+    color: #2c3e50;
+    border-top: 1px solid #dee2e6;
+    padding-top: 0.65rem;
+}
+
+.propuesta-resumen-linea.descuento {
+    color: #e67e22;
+}
+
+.propuesta-resumen-linea.impuestos {
+    color: #e74c3c;
+}
+
+.propuesta-resumen-linea.total {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #0d47a1;
+    border-top: 2px solid #0d47a1;
+    padding-top: 0.85rem;
+    margin-top: 0.5rem;
+}
+
+/* ===== Condiciones ===== */
+.propuesta-condiciones {
+    margin-top: 1.5rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.propuesta-condicion-bloque {
+    background: #f8f9fa;
+    border-left: 3px solid #7f8c8d;
+    padding: 0.75rem 1rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: #555;
+    line-height: 1.5;
+}
+
+/* ===== Firmas ===== */
+.propuesta-firmas {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    margin-top: 3rem;
+    page-break-inside: avoid;
+}
+
+.propuesta-firma-box {
+    text-align: center;
+}
+
+.propuesta-firma-linea {
+    border-top: 1.5px solid #2c3e50;
+    margin-bottom: 0.5rem;
+    padding-top: 4rem;
+}
+
+.propuesta-firma-nombre {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #2c3e50;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.propuesta-firma-cargo {
+    font-size: 0.72rem;
+    color: #7f8c8d;
+    margin-top: 0.15rem;
+}
+
+/* ===== Pie de página ===== */
+.propuesta-footer {
+    text-align: center;
+    font-size: 0.72rem;
+    color: #95a5a6;
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid #dee2e6;
+}
+
+/* ===== Badge estado ===== */
+.badge-estado {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+/* ===== Formulario de propuesta ===== */
+.form-section {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    margin-bottom: 1.25rem;
+}
+
+.form-section h3 {
+    font-size: 1rem;
+    color: #2c3e50;
+    margin: 0 0 1rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.tabla-items-propuesta {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.tabla-items-propuesta th {
+    background: #0d47a1;
+    color: white;
+    padding: 0.5rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.tabla-items-propuesta td {
+    padding: 0.4rem;
+    border-bottom: 1px solid #eef0f2;
+    vertical-align: middle;
+}
+
+.tabla-items-propuesta input[type="number"] {
+    width: 100%;
+    padding: 0.35rem 0.4rem;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 0.82rem;
+    text-align: right;
+}
+
+.tabla-items-propuesta input[type="number"]:focus {
+    outline: none;
+    border-color: var(--secondary-color);
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.tabla-items-propuesta input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.resumen-propuesta {
+    background: #f8f9fa;
+    border: 2px solid #0d47a1;
+    border-radius: 6px;
+    padding: 1rem 1.5rem;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+    .propuesta-header-institucional {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .propuesta-doc-datos {
+        text-align: left;
+    }
+    
+    .propuesta-info-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .propuesta-condiciones {
+        grid-template-columns: 1fr;
+    }
+    
+    .propuesta-firmas {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+    
+    .propuesta-tabla {
+        font-size: 0.72rem;
+    }
+}
+
+/* ===== Impresión ===== */
+@media print {
+    body {
+        background: white;
+    }
+    
+    .no-print,
+    header,
+    footer,
+    .navbar,
+    .main-footer {
+        display: none !important;
+    }
+    
+    .propuesta-container {
+        box-shadow: none !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+    }
+    
+    .propuesta-tabla th {
+        background: #0d47a1 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    
+    .propuesta-tabla tbody tr:nth-child(even) {
+        background: #f8f9fa !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    
+    .propuesta-resumen {
+        border: 2px solid #0d47a1 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    
+    .propuesta-firmas {
+        page-break-inside: avoid;
+    }
+    
+    .propuesta-seccion-titulo {
+        page-break-after: avoid;
+    }
+    
+    @page {
+        size: A4;
+        margin: 1.5cm 1cm;
+    }
+}

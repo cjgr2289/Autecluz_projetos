@@ -198,8 +198,6 @@ $mensaje = $_GET['mensaje'] ?? '';
     });
     </script>
     
-    <script src="../../assets/js/notificaciones.js"></script>
-    
     <?php include '../../includes/footer.php'; ?>
 </body>
 </html>

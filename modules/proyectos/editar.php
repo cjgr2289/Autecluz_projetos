@@ -450,8 +450,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     });
     </script>
     
-    <script src="<?php echo url('assets/js/notificaciones.js'); ?>"></script>
-    
-    <?php include '../../includes/footer.php'; ?>
+   <?php include '../../includes/footer.php'; ?>
 </body>
 </html>

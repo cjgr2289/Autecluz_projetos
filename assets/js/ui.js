@@ -191,86 +191,48 @@ const Confirm = (function() {
 })();
 
 // ============================================
-// REEMPLAZO GLOBAL DE alert() Y confirm()
+// DROPDOWNS GENÉRICOS
+// Cierra cualquier otro dropdown abierto antes de abrir el nuevo.
 // ============================================
-
-/**
- * Sobrescribe window.alert() con toasts.
- * Los mensajes de error/éxito se detectan por palabras clave.
- */
-window.alert = function(mensaje) {
-    if (typeof mensaje !== 'string') mensaje = String(mensaje);
-    
-    // Detectar tipo por palabra clave
-    const lower = mensaje.toLowerCase();
-    let tipo = 'info';
-    
-    if (lower.includes('error') || lower.includes('erro') || lower.includes('falha') || lower.includes('falha')) {
-        tipo = 'error';
-    } else if (lower.includes('sucesso') || lower.includes('éxito') || lower.includes('exito')) {
-        tipo = 'success';
-    } else if (lower.includes('atenção') || lower.includes('atencion') || lower.includes('atención') || lower.includes('aviso')) {
-        tipo = 'warning';
+function toggleDropdown(e, menuId) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
     }
     
-    Toast.show(mensaje, tipo, { duracion: 5000 });
-    console.log('[alert→toast]', tipo, mensaje);
-};
-
-// ============================================
-// MENÚ DE USUARIO
-// ============================================
-function toggleUserMenu(e) {
-    if (e) e.stopPropagation();
+    const container = e ? e.target.closest('.dropdown-acciones') : null;
+    if (!container) return;
     
-    const menu = document.getElementById('user-dropdown');
-    const navMenu = document.querySelector('.nav-user-menu');
-    if (!menu) return;
+    const estabaAbierto = container.classList.contains('abierto');
     
-    const abierto = menu.style.display !== 'none';
+    // Cerrar todos los dropdowns
+    document.querySelectorAll('.dropdown-acciones.abierto').forEach(el => {
+        el.classList.remove('abierto');
+    });
     
-    if (abierto) {
-        menu.style.display = 'none';
-        if (navMenu) navMenu.classList.remove('abierto');
-    } else {
-        menu.style.display = 'block';
-        if (navMenu) navMenu.classList.add('abierto');
+    // Si estaba cerrado, abrir
+    if (!estabaAbierto) {
+        container.classList.add('abierto');
     }
 }
 
-// Cerrar al hacer click fuera
+// Cerrar al hacer clic fuera
 document.addEventListener('click', function(e) {
-    const menu = document.getElementById('user-dropdown');
-    const navMenu = document.querySelector('.nav-user-menu');
-    if (!menu || menu.style.display === 'none') return;
-    
-    if (!e.target.closest('.nav-user-menu')) {
-        menu.style.display = 'none';
-        if (navMenu) navMenu.classList.remove('abierto');
+    if (!e.target.closest('.dropdown-acciones')) {
+        document.querySelectorAll('.dropdown-acciones.abierto').forEach(el => {
+            el.classList.remove('abierto');
+        });
     }
 });
 
 // Cerrar con ESC
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
-        const menu = document.getElementById('user-dropdown');
-        const navMenu = document.querySelector('.nav-user-menu');
-        if (menu && menu.style.display !== 'none') {
-            menu.style.display = 'none';
-            if (navMenu) navMenu.classList.remove('abierto');
-        }
+        document.querySelectorAll('.dropdown-acciones.abierto').forEach(el => {
+            el.classList.remove('abierto');
+        });
     }
 });
-
-/**
- * Guarda el confirm() original para uso interno y lo reemplaza
- * por una versión que usa el modal.
- * 
- * Nota: confirm() es SÍNCRONO en JS nativo, mientras que nuestro modal es asíncrono.
- * Para mantener compatibilidad con onclick="return confirm(...)", no podemos reemplazarlo
- * directamente porque rompería el flujo. En su lugar, exponemos Confirm.show() y
- * actualizamos los onclick manualmente.
- */
 
 // ============================================
 // HELPERS
