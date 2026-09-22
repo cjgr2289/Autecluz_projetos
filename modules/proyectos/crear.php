@@ -4,14 +4,20 @@ require_once '../../config/database.php';
 require_once '../../includes/functions.php';
 verificarSesion();
 
-// Permisos: directivo, gerenciador, supervisor y proyectista pueden crear proyectos
 if (!tienePermiso(['directivo', 'gerenciador', 'supervisor', 'proyectista']) && !esMaster()) {
-    header('Location: index.php?error=no_permitido');
-    exit();
+    redirigir('modules/proyectos/index.php?error=no_permitido');
 }
 
 $db = Database::getInstance()->getConnection();
 $estados = getEstadosProyecto();
+
+// Cargar candidatos a encargado
+$stmt = $db->query("SELECT id, nombre_completo, tipo_usuario 
+                    FROM usuarios 
+                    WHERE tipo_usuario IN ('supervisor', 'proyectista') 
+                      AND activo = 1 
+                    ORDER BY nombre_completo");
+$encargados_disponibles = $stmt->fetchAll();
 
 $errores = [];
 
@@ -26,58 +32,49 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $fecha_aprobacion = $_POST['fecha_aprobacion'] ?? null;
     $encargado_id = !empty($_POST['encargado_id']) ? (int)$_POST['encargado_id'] : null;
     
-    // Validaciones
+    // Validaciones básicas
     if (empty($nombre)) {
         $errores[] = 'El nombre del proyecto es obligatorio';
     }
-    
     if (empty($fecha_inicio)) {
         $errores[] = 'La fecha de inicio es obligatoria';
     }
-    
     if (empty($fecha_fin)) {
         $errores[] = 'La fecha de fin es obligatoria';
     }
-    
     if (!empty($fecha_inicio) && !empty($fecha_fin) && $fecha_fin < $fecha_inicio) {
         $errores[] = 'La fecha de fin no puede ser anterior a la fecha de inicio';
     }
-    
-    // Validar que el estado sea válido
     if (!isset($estados[$estado])) {
         $estado = 'solicitado';
     }
-    
-    // Solo directivos/gerenciadores/Master pueden establecer un estado distinto a "solicitado"
     if (!tienePermiso(['directivo', 'gerenciador']) && !esMaster()) {
         $estado = 'solicitado';
     }
     
-    // Validar fecha de aprobación (solo si el estado es aprobado por cliente o posterior)
-    if (!empty($fecha_aprobacion)) {
-        if ($fecha_aprobacion < $fecha_inicio) {
-            $errores[] = 'La fecha de aprobación no puede ser anterior a la fecha de inicio';
+    // Validar PDF (si se subió)
+    $pdf_subido = null;
+    if (!empty($_FILES['propuesta_tecnica']['name'])) {
+        $validacion = validarPdfSubido($_FILES['propuesta_tecnica']);
+        if (!$validacion['ok']) {
+            $errores[] = 'Propuesta técnica: ' . $validacion['error'];
         }
     }
     
-    // Si no hay errores, guardar
     if (empty($errores)) {
         try {
             $db->beginTransaction();
             
+            // Insertar proyecto
             $stmt = $db->prepare("
                 INSERT INTO proyectos 
-                      (nombre, descripcion, fecha_inicio, fecha_fin, estado, 
-                       orden_compra, fecha_aprobacion, usuario_creacion, encargado_id)
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    (nombre, descripcion, fecha_inicio, fecha_fin, estado, 
+                     orden_compra, fecha_aprobacion, usuario_creacion, encargado_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
-                $nombre, 
-                $descripcion, 
-                $fecha_inicio, 
-                $fecha_fin, 
-                $estado, 
-                $orden_compra, 
+                $nombre, $descripcion, $fecha_inicio, $fecha_fin, $estado,
+                $orden_compra,
                 !empty($fecha_aprobacion) ? $fecha_aprobacion : null,
                 $_SESSION['usuario_id'],
                 $encargado_id
@@ -85,23 +82,41 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
             $proyecto_id = $db->lastInsertId();
             
-            // Guardar en historial
+            // Guardar PDF si se subió
+            if (!empty($_FILES['propuesta_tecnica']['name'])) {
+                $resultado_pdf = guardarPdfPropuesta($_FILES['propuesta_tecnica'], $proyecto_id);
+                if ($resultado_pdf['ok'] && empty($resultado_pdf['vacio'])) {
+                    $stmt = $db->prepare("UPDATE proyectos 
+                                          SET propuesta_tecnica = ?, 
+                                              propuesta_nombre_original = ?, 
+                                              propuesta_fecha_subida = NOW(),
+                                              propuesta_subida_por = ?
+                                          WHERE id = ?");
+                    $stmt->execute([
+                        $resultado_pdf['archivo'],
+                        $resultado_pdf['nombre_original'],
+                        $_SESSION['usuario_id'],
+                        $proyecto_id
+                    ]);
+                } else {
+                    // No detener la creación, solo registrar error
+                    error_log("Error al guardar PDF de propuesta: " . ($resultado_pdf['error'] ?? 'desconocido'));
+                }
+            }
+            
+            // Historial
             $stmt = $db->prepare("
                 INSERT INTO historial_proyectos 
                     (proyecto_id, estado_anterior, estado_nuevo, usuario_id, comentario)
                 VALUES (?, NULL, ?, ?, ?)
             ");
             $stmt->execute([
-                $proyecto_id,
-                $estado,
-                $_SESSION['usuario_id'],
-                'Proyecto creado'
+                $proyecto_id, $estado, $_SESSION['usuario_id'], 'Proyecto creado'
             ]);
             
             $db->commit();
             
-            header('Location: ver.php?id=' . $proyecto_id . '&mensaje=creado');
-            exit();
+            redirigir('modules/proyectos/ver.php?id=' . $proyecto_id . '&mensaje=creado');
             
         } catch (PDOException $e) {
             $db->rollBack();
@@ -110,7 +125,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// Valores por defecto para repoblar el formulario
 $valores = [
     'nombre'            => $_POST['nombre'] ?? '',
     'descripcion'       => $_POST['descripcion'] ?? '',
@@ -119,17 +133,10 @@ $valores = [
     'estado'            => $_POST['estado'] ?? 'solicitado',
     'orden_compra'      => $_POST['orden_compra'] ?? '',
     'fecha_aprobacion'  => $_POST['fecha_aprobacion'] ?? '',
+    'encargado_id'      => $_POST['encargado_id'] ?? '',
 ];
 
 $puede_cambiar_estado = tienePermiso(['directivo', 'gerenciador']) || esMaster();
-
-// Cargar supervisores y proyectistas como candidatos a encargado
-$stmt = $db->query("SELECT id, nombre_completo, tipo_usuario 
-                    FROM usuarios 
-                    WHERE tipo_usuario IN ('supervisor', 'proyectista') 
-                      AND activo = 1 
-                    ORDER BY nombre_completo");
-$encargados_disponibles = $stmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo $_SESSION['idioma'] ?? 'es'; ?>">
@@ -137,14 +144,15 @@ $encargados_disponibles = $stmt->fetchAll();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo traducir('Crear Proyecto'); ?> - Sistema</title>
-    <link rel="stylesheet" href="../../assets/css/style.css">
-    <link rel="stylesheet" href="../../assets/css/navbar.css">
-    <link rel="stylesheet" href="../../assets/css/formularios.css">
-    <link rel="stylesheet" href="../../assets/css/mensajes.css">
-    <link rel="stylesheet" href="../../assets/css/badges.css">
-    <link rel="stylesheet" href="../../assets/css/proyectos.css">
-    <link rel="stylesheet" href="../../assets/css/notificaciones.css">
-    <link rel="stylesheet" href="../../assets/css/footer.css">
+    <link rel="stylesheet" href="<?php echo url('assets/css/style.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/navbar.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/formularios.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/mensajes.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/badges.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/proyectos.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/ui.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/notificaciones.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url('assets/css/footer.css'); ?>">
 </head>
 <body>
     <?php include '../../includes/header.php'; ?>
@@ -152,7 +160,7 @@ $encargados_disponibles = $stmt->fetchAll();
     <div class="container">
         <div class="page-header">
             <h1><?php echo traducir('Crear Proyecto'); ?></h1>
-            <a href="index.php" class="btn-secondary">← <?php echo traducir('Volver'); ?></a>
+            <a href="<?php echo url('modules/proyectos/index.php'); ?>" class="btn-secondary">← <?php echo traducir('Volver'); ?></a>
         </div>
         
         <?php if (!empty($errores)): ?>
@@ -163,59 +171,55 @@ $encargados_disponibles = $stmt->fetchAll();
                         <li><?php echo htmlspecialchars($err); ?></li>
                     <?php endforeach; ?>
                 </ul>
-            </div>  
+            </div>
         <?php endif; ?>
         
-        
         <div class="form-container">
-            <form method="POST" action="" id="form-proyecto">
+            <form method="POST" action="" id="form-proyecto" enctype="multipart/form-data">
                 
-                <!-- ===== Nombre ===== -->
                 <div class="form-group">
-                    <label for="nombre">
-                        <?php echo traducir('Nombre del Proyecto'); ?> *
-                    </label>
-                    <input type="text" 
-                           id="nombre" 
-                           name="nombre" 
+                    <label for="nombre"><?php echo traducir('Nombre del Proyecto'); ?> *</label>
+                    <input type="text" id="nombre" name="nombre" 
                            value="<?php echo htmlspecialchars($valores['nombre']); ?>"
-                           placeholder="<?php echo $_SESSION['idioma'] == 'pt' ? 'Ex: Reforma do escritório' : 'Ej: Reforma de oficina'; ?>"
-                           maxlength="200"
-                           required 
-                           autofocus>
+                           maxlength="200" required autofocus>
                 </div>
                 
-                <!-- ===== Descripción ===== -->
                 <div class="form-group">
                     <label for="descripcion"><?php echo traducir('Descripción'); ?></label>
-                    <textarea id="descripcion" 
-                              name="descripcion" 
-                              rows="3"
-                              placeholder="<?php echo $_SESSION['idioma'] == 'pt' ? 'Descrição do projeto...' : 'Descripción del proyecto...'; ?>"><?php echo htmlspecialchars($valores['descripcion']); ?></textarea>
+                    <textarea id="descripcion" name="descripcion" rows="3"><?php echo htmlspecialchars($valores['descripcion']); ?></textarea>
                 </div>
                 
-                <!-- ===== Fechas ===== -->
+                <!-- ===== Propuesta técnica (PDF) ===== -->
+                <div class="form-group">
+                    <label for="propuesta_tecnica">
+                        <?php echo $_SESSION['idioma'] == 'pt' ? 'Proposta Técnica (PDF)' : 'Propuesta Técnica (PDF)'; ?>
+                    </label>
+                    <div class="file-upload-wrapper">
+                        <input type="file" 
+                               id="propuesta_tecnica" 
+                               name="propuesta_tecnica" 
+                               accept="application/pdf,.pdf"
+                               class="file-input">
+                        <div class="file-upload-info">
+                            <span class="file-name" id="file-name"><?php echo $_SESSION['idioma'] == 'pt' ? 'Nenhum arquivo selecionado' : 'Ningún archivo seleccionado'; ?></span>
+                            <span class="file-hint"><?php echo $_SESSION['idioma'] == 'pt' ? 'Máx. 20 MB, apenas PDF' : 'Máx. 20 MB, solo PDF'; ?></span>
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="form-row">
                     <div class="form-group">
                         <label for="fecha_inicio"><?php echo traducir('Fecha Inicio'); ?> *</label>
-                        <input type="date" 
-                               id="fecha_inicio" 
-                               name="fecha_inicio" 
-                               value="<?php echo htmlspecialchars($valores['fecha_inicio']); ?>" 
-                               required>
+                        <input type="date" id="fecha_inicio" name="fecha_inicio" 
+                               value="<?php echo htmlspecialchars($valores['fecha_inicio']); ?>" required>
                     </div>
-                    
                     <div class="form-group">
                         <label for="fecha_fin"><?php echo traducir('Fecha Fin'); ?> *</label>
-                        <input type="date" 
-                               id="fecha_fin" 
-                               name="fecha_fin" 
-                               value="<?php echo htmlspecialchars($valores['fecha_fin']); ?>" 
-                               required>
+                        <input type="date" id="fecha_fin" name="fecha_fin" 
+                               value="<?php echo htmlspecialchars($valores['fecha_fin']); ?>" required>
                     </div>
                 </div>
                 
-                <!-- ===== Estado y Fecha de Aprobación ===== -->
                 <div class="form-row">
                     <div class="form-group">
                         <label for="estado">
@@ -226,9 +230,7 @@ $encargados_disponibles = $stmt->fetchAll();
                                 </small>
                             <?php endif; ?>
                         </label>
-                        <select id="estado" 
-                                name="estado" 
-                                <?php echo !$puede_cambiar_estado ? 'disabled' : ''; ?>>
+                        <select id="estado" name="estado" <?php echo !$puede_cambiar_estado ? 'disabled' : ''; ?>>
                             <?php foreach ($estados as $key => $value): ?>
                                 <option value="<?php echo $key; ?>" 
                                     <?php echo $valores['estado'] == $key ? 'selected' : ''; ?>>
@@ -238,57 +240,42 @@ $encargados_disponibles = $stmt->fetchAll();
                         </select>
                         <?php if (!$puede_cambiar_estado): ?>
                             <input type="hidden" name="estado" value="<?php echo htmlspecialchars($valores['estado']); ?>">
-                            <small style="color:#7f8c8d; display:block; margin-top:0.25rem;">
-                                <?php echo $_SESSION['idioma'] == 'pt' 
-                                    ? 'Apenas diretores e gerentes podem alterar o status.'
-                                    : 'Solo directivos y gerenciadores pueden cambiar el estado.'; ?>
-                            </small>
                         <?php endif; ?>
                     </div>
-                    
                     <div class="form-group">
                         <label for="fecha_aprobacion"><?php echo traducir('Fecha Aprobación'); ?></label>
-                        <input type="date" 
-                               id="fecha_aprobacion" 
-                               name="fecha_aprobacion" 
+                        <input type="date" id="fecha_aprobacion" name="fecha_aprobacion" 
                                value="<?php echo htmlspecialchars($valores['fecha_aprobacion']); ?>">
                     </div>
                 </div>
                 
-                <!-- ===== Orden de Compra ===== -->
-                <div class="form-group">
-                    <label for="orden_compra"><?php echo traducir('Número de Orden de Compra'); ?></label>
-                    <input type="text" 
-                           id="orden_compra" 
-                           name="orden_compra" 
-                           value="<?php echo htmlspecialchars($valores['orden_compra']); ?>"
-                           placeholder="<?php echo $_SESSION['idioma'] == 'pt' ? 'Ex: OC-2026-001' : 'Ej: OC-2026-001'; ?>"
-                           maxlength="50">
-                </div>
-
-                <!-- ===== Encargado del Proyecto ===== -->
-                <div class="form-group">
-                    <label for="encargado_id">
-                        <?php echo traducir('Encargado del Proyecto'); ?>
-                    </label>
-                    <select id="encargado_id" name="encargado_id">
-                        <option value="">-- <?php echo traducir('Seleccione un encargado'); ?> --</option>
-                        <?php foreach ($encargados_disponibles as $enc): ?>
-                            <option value="<?php echo $enc['id']; ?>"
-                                <?php echo (isset($valores['encargado_id']) && $valores['encargado_id'] == $enc['id']) ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($enc['nombre_completo']); ?>
-                                (<?php echo traducir(ucfirst($enc['tipo_usuario'])); ?>)
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="orden_compra"><?php echo traducir('Número de Orden de Compra'); ?></label>
+                        <input type="text" id="orden_compra" name="orden_compra" 
+                               value="<?php echo htmlspecialchars($valores['orden_compra']); ?>"
+                               maxlength="50">
+                    </div>
+                    <div class="form-group">
+                        <label for="encargado_id"><?php echo traducir('Encargado del Proyecto'); ?></label>
+                        <select id="encargado_id" name="encargado_id">
+                            <option value="">-- <?php echo traducir('Seleccione un encargado'); ?> --</option>
+                            <?php foreach ($encargados_disponibles as $enc): ?>
+                                <option value="<?php echo $enc['id']; ?>"
+                                    <?php echo $valores['encargado_id'] == $enc['id'] ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($enc['nombre_completo']); ?>
+                                    (<?php echo traducir(ucfirst($enc['tipo_usuario'])); ?>)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                 </div>
                 
-                <!-- ===== Botones ===== -->
                 <div class="form-actions">
                     <button type="submit" class="btn-primary">
                         💾 <?php echo traducir('Crear Proyecto'); ?>
                     </button>
-                    <a href="index.php" class="btn-secondary">
+                    <a href="<?php echo url('modules/proyectos/index.php'); ?>" class="btn-secondary">
                         <?php echo traducir('Cancelar'); ?>
                     </a>
                 </div>
@@ -297,11 +284,41 @@ $encargados_disponibles = $stmt->fetchAll();
     </div>
     
     <script>
-    // Validación cliente: fecha_fin >= fecha_inicio
+    // Mostrar el nombre del archivo seleccionado
+    const fileInput = document.getElementById('propuesta_tecnica');
+    const fileName = document.getElementById('file-name');
+    
+    if (fileInput) {
+        fileInput.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                const file = this.files[0];
+                
+                // Validar tipo
+                if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+                    alert('<?php echo $_SESSION['idioma'] == 'pt' ? 'Apenas arquivos PDF são permitidos' : 'Solo se permiten archivos PDF'; ?>');
+                    this.value = '';
+                    fileName.textContent = '<?php echo $_SESSION['idioma'] == 'pt' ? 'Nenhum arquivo selecionado' : 'Ningún archivo seleccionado'; ?>';
+                    return;
+                }
+                
+                // Validar tamaño (20 MB)
+                if (file.size > 20 * 1024 * 1024) {
+                    alert('<?php echo $_SESSION['idioma'] == 'pt' ? 'O arquivo excede 20 MB' : 'El archivo supera 20 MB'; ?>');
+                    this.value = '';
+                    fileName.textContent = '<?php echo $_SESSION['idioma'] == 'pt' ? 'Nenhum arquivo selecionado' : 'Ningún archivo seleccionado'; ?>';
+                    return;
+                }
+                
+                fileName.textContent = file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + ' MB)';
+                fileName.style.color = '#27ae60';
+            }
+        });
+    }
+    
+    // Validar fechas
     document.getElementById('form-proyecto').addEventListener('submit', function(e) {
         const inicio = document.getElementById('fecha_inicio').value;
         const fin = document.getElementById('fecha_fin').value;
-        const aprob = document.getElementById('fecha_aprobacion').value;
         
         if (inicio && fin && fin < inicio) {
             e.preventDefault();
@@ -310,26 +327,10 @@ $encargados_disponibles = $stmt->fetchAll();
                 : "La fecha de fin no puede ser anterior a la fecha de inicio."; ?>');
             return false;
         }
-        
-        if (inicio && aprob && aprob < inicio) {
-            e.preventDefault();
-            alert('<?php echo $_SESSION["idioma"] == "pt" 
-                ? "A data de aprovação não pode ser anterior à data de início." 
-                : "La fecha de aprobación no puede ser anterior a la fecha de inicio."; ?>');
-            return false;
-        }
-    });
-    
-    // Auto-ajustar fecha_fin cuando cambia fecha_inicio (solo si fecha_fin < fecha_inicio)
-    document.getElementById('fecha_inicio').addEventListener('change', function() {
-        const fin = document.getElementById('fecha_fin');
-        if (fin.value && fin.value < this.value) {
-            fin.value = this.value;
-        }
     });
     </script>
     
-    <script src="../../assets/js/notificaciones.js"></script>
+    <script src="<?php echo url('assets/js/notificaciones.js'); ?>"></script>
     
     <?php include '../../includes/footer.php'; ?>
 </body>

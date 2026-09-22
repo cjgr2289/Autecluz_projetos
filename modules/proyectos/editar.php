@@ -4,7 +4,6 @@ require_once '../../config/database.php';
 require_once '../../includes/functions.php';
 verificarSesion();
 
-// Permisos: directivo, gerenciador, supervisor y proyectista pueden editar
 if (!tienePermiso(['directivo', 'gerenciador', 'supervisor', 'proyectista']) && !esMaster()) {
     redirigir('modules/proyectos/index.php?error=no_permitido');
 }
@@ -16,8 +15,11 @@ if (!$id) {
     redirigir('modules/proyectos/index.php');
 }
 
-// Obtener el proyecto
-$stmt = $db->prepare("SELECT * FROM proyectos WHERE id = ?");
+$stmt = $db->prepare("SELECT p.*, 
+                             u.nombre_completo as propuesta_subida_por_nombre
+                      FROM proyectos p
+                      LEFT JOIN usuarios u ON p.propuesta_subida_por = u.id
+                      WHERE p.id = ?");
 $stmt->execute([$id]);
 $proyecto = $stmt->fetch();
 
@@ -25,7 +27,6 @@ if (!$proyecto) {
     redirigir('modules/proyectos/index.php');
 }
 
-// Cargar candidatos a encargado (supervisores y proyectistas)
 $stmt = $db->query("SELECT id, nombre_completo, tipo_usuario 
                     FROM usuarios 
                     WHERE tipo_usuario IN ('supervisor', 'proyectista') 
@@ -39,7 +40,6 @@ $puede_cambiar_estado = tienePermiso(['directivo', 'gerenciador']) || esMaster()
 $errores = [];
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Sanitizar y validar
     $nombre = trim($_POST['nombre'] ?? '');
     $descripcion = trim($_POST['descripcion'] ?? '');
     $fecha_inicio = $_POST['fecha_inicio'] ?? '';
@@ -49,42 +49,65 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $orden_compra = trim($_POST['orden_compra'] ?? '') ?: null;
     $fecha_aprobacion = $_POST['fecha_aprobacion'] ?? null;
     $encargado_id = !empty($_POST['encargado_id']) ? (int)$_POST['encargado_id'] : null;
+    $eliminar_pdf = !empty($_POST['eliminar_pdf']);
     
-    // Solo directivos/gerenciadores pueden cambiar el estado
     if (!$puede_cambiar_estado) {
         $estado = $estado_anterior;
     }
     
     // Validaciones
-    if (empty($nombre)) {
-        $errores[] = 'El nombre del proyecto es obligatorio';
-    }
-    
-    if (empty($fecha_inicio)) {
-        $errores[] = 'La fecha de inicio es obligatoria';
-    }
-    
-    if (empty($fecha_fin)) {
-        $errores[] = 'La fecha de fin es obligatoria';
-    }
-    
+    if (empty($nombre)) $errores[] = 'El nombre del proyecto es obligatorio';
+    if (empty($fecha_inicio)) $errores[] = 'La fecha de inicio es obligatoria';
+    if (empty($fecha_fin)) $errores[] = 'La fecha de fin es obligatoria';
     if (!empty($fecha_inicio) && !empty($fecha_fin) && $fecha_fin < $fecha_inicio) {
         $errores[] = 'La fecha de fin no puede ser anterior a la fecha de inicio';
     }
+    if (!isset($estados[$estado])) $errores[] = 'Estado no válido';
     
-    if (!empty($fecha_aprobacion) && $fecha_aprobacion < $fecha_inicio) {
-        $errores[] = 'La fecha de aprobación no puede ser anterior a la fecha de inicio';
+    // Validar PDF si se subió uno nuevo
+    $subir_pdf_nuevo = !empty($_FILES['propuesta_tecnica']['name']);
+    if ($subir_pdf_nuevo) {
+        $validacion = validarPdfSubido($_FILES['propuesta_tecnica']);
+        if (!$validacion['ok']) {
+            $errores[] = 'Propuesta técnica: ' . $validacion['error'];
+        }
     }
     
-    // Validar que el estado sea válido
-    if (!isset($estados[$estado])) {
-        $errores[] = 'Estado no válido';
-    }
-    
-    // Si no hay errores, actualizar
     if (empty($errores)) {
         try {
             $db->beginTransaction();
+            
+            // Manejar PDF
+            $pdf_actual = $proyecto['propuesta_tecnica'];
+            $nombre_original = $proyecto['propuesta_nombre_original'];
+            $fecha_subida = $proyecto['propuesta_fecha_subida'];
+            $subida_por = $proyecto['propuesta_subida_por'];
+            
+            // Si el usuario pidió eliminar el PDF
+            if ($eliminar_pdf && $pdf_actual) {
+                eliminarPdfPropuesta($pdf_actual);
+                $pdf_actual = null;
+                $nombre_original = null;
+                $fecha_subida = null;
+                $subida_por = null;
+            }
+            
+            // Si se subió un PDF nuevo, reemplazar el anterior
+            if ($subir_pdf_nuevo) {
+                if ($pdf_actual) {
+                    eliminarPdfPropuesta($pdf_actual);
+                }
+                
+                $resultado_pdf = guardarPdfPropuesta($_FILES['propuesta_tecnica'], $id);
+                if ($resultado_pdf['ok'] && empty($resultado_pdf['vacio'])) {
+                    $pdf_actual = $resultado_pdf['archivo'];
+                    $nombre_original = $resultado_pdf['nombre_original'];
+                    $fecha_subida = date('Y-m-d H:i:s');
+                    $subida_por = $_SESSION['usuario_id'];
+                } else {
+                    error_log("Error al guardar PDF: " . ($resultado_pdf['error'] ?? 'desconocido'));
+                }
+            }
             
             $stmt = $db->prepare("
                 UPDATE proyectos 
@@ -95,22 +118,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     estado = ?, 
                     orden_compra = ?, 
                     fecha_aprobacion = ?,
-                    encargado_id = ?
+                    encargado_id = ?,
+                    propuesta_tecnica = ?,
+                    propuesta_nombre_original = ?,
+                    propuesta_fecha_subida = ?,
+                    propuesta_subida_por = ?
                 WHERE id = ?
             ");
             $stmt->execute([
-                $nombre, 
-                $descripcion, 
-                $fecha_inicio, 
-                $fecha_fin, 
-                $estado, 
-                $orden_compra, 
+                $nombre, $descripcion, $fecha_inicio, $fecha_fin,
+                $estado, $orden_compra,
                 !empty($fecha_aprobacion) ? $fecha_aprobacion : null,
                 $encargado_id,
+                $pdf_actual,
+                $nombre_original,
+                $fecha_subida,
+                $subida_por,
                 $id
             ]);
             
-            // Si cambió el estado, guardar historial y aplicar reglas automáticas
+            // Historial si cambió el estado
             if ($estado !== $estado_anterior) {
                 $stmt = $db->prepare("
                     INSERT INTO historial_proyectos 
@@ -118,27 +145,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     VALUES (?, ?, ?, ?, ?)
                 ");
                 $stmt->execute([
-                    $id,
-                    $estado_anterior,
-                    $estado,
-                    $_SESSION['usuario_id'],
-                    'Cambio de estado en edición'
+                    $id, $estado_anterior, $estado,
+                    $_SESSION['usuario_id'], 'Cambio de estado en edición'
                 ]);
                 
-                // REGLA AUTOMÁTICA:
-                // Cuando el proyecto pasa a "aprovado_cliente",
-                // todos los items en estado "solicitado" pasan a "pendiente"
+                // Regla automática: aprovado_cliente → items solicitado → pendiente
                 if ($estado === 'aprovado_cliente' && $estado_anterior !== 'aprovado_cliente') {
-                    $stmt = $db->prepare("
-                        UPDATE items_proyecto 
-                        SET estado = 'pendiente' 
-                        WHERE proyecto_id = ? AND estado = 'solicitado'
-                    ");
+                    $stmt = $db->prepare("UPDATE items_proyecto 
+                                          SET estado = 'pendiente' 
+                                          WHERE proyecto_id = ? AND estado = 'solicitado'");
                     $stmt->execute([$id]);
                     
-                    // Registrar el cambio automático en el historial de items
-                    $items_cambiados = $stmt->rowCount();
-                    if ($items_cambiados > 0) {
+                    if ($stmt->rowCount() > 0) {
                         $stmt = $db->prepare("
                             INSERT INTO historial_items 
                                 (item_id, estado_anterior, estado_nuevo, usuario_id, comentario)
@@ -165,28 +183,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     }
     
-    // Repoblar valores con los datos enviados
     $valores = [
-        'nombre'            => $nombre,
-        'descripcion'       => $descripcion,
-        'fecha_inicio'      => $fecha_inicio,
-        'fecha_fin'         => $fecha_fin,
-        'estado'            => $estado,
-        'orden_compra'      => $orden_compra,
-        'fecha_aprobacion'  => $fecha_aprobacion,
-        'encargado_id'      => $encargado_id,
+        'nombre' => $nombre, 'descripcion' => $descripcion,
+        'fecha_inicio' => $fecha_inicio, 'fecha_fin' => $fecha_fin,
+        'estado' => $estado, 'orden_compra' => $orden_compra,
+        'fecha_aprobacion' => $fecha_aprobacion, 'encargado_id' => $encargado_id,
     ];
 } else {
-    // Valores originales del proyecto
     $valores = [
-        'nombre'            => $proyecto['nombre'],
-        'descripcion'       => $proyecto['descripcion'],
-        'fecha_inicio'      => $proyecto['fecha_inicio'],
-        'fecha_fin'         => $proyecto['fecha_fin'],
-        'estado'            => $proyecto['estado'],
-        'orden_compra'      => $proyecto['orden_compra'],
-        'fecha_aprobacion'  => $proyecto['fecha_aprobacion'],
-        'encargado_id'      => $proyecto['encargado_id'] ?? null,
+        'nombre' => $proyecto['nombre'], 'descripcion' => $proyecto['descripcion'],
+        'fecha_inicio' => $proyecto['fecha_inicio'], 'fecha_fin' => $proyecto['fecha_fin'],
+        'estado' => $proyecto['estado'], 'orden_compra' => $proyecto['orden_compra'],
+        'fecha_aprobacion' => $proyecto['fecha_aprobacion'], 
+        'encargado_id' => $proyecto['encargado_id'] ?? null,
     ];
 }
 ?>
@@ -212,11 +221,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <div class="container">
         <div class="page-header">
             <h1><?php echo traducir('Editar Proyecto'); ?></h1>
-            <div>
-                <a href="<?php echo url('modules/proyectos/ver.php?id=' . $id); ?>" class="btn-secondary">
-                    ← <?php echo traducir('Volver'); ?>
-                </a>
-            </div>
+            <a href="<?php echo url('modules/proyectos/ver.php?id=' . $id); ?>" class="btn-secondary">← <?php echo traducir('Volver'); ?></a>
         </div>
         
         <?php if (!empty($errores)): ?>
@@ -230,63 +235,100 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </div>
         <?php endif; ?>
         
-        <!-- Info del proyecto -->
         <div class="info-message">
             <strong>#<?php echo $id; ?></strong> — <?php echo htmlspecialchars($proyecto['nombre']); ?>
-            <?php if ($proyecto['orden_compra']): ?>
-                <span style="margin-left:1rem;">
-                    <strong>O.C.:</strong> <?php echo htmlspecialchars($proyecto['orden_compra']); ?>
-                </span>
-            <?php endif; ?>
         </div>
         
         <div class="form-container">
-            <form method="POST" action="" id="form-proyecto">
+            <form method="POST" action="" id="form-proyecto" enctype="multipart/form-data">
                 
-                <!-- ===== Nombre ===== -->
                 <div class="form-group">
-                    <label for="nombre">
-                        <?php echo traducir('Nombre del Proyecto'); ?> *
-                    </label>
-                    <input type="text" 
-                           id="nombre" 
-                           name="nombre" 
+                    <label for="nombre"><?php echo traducir('Nombre del Proyecto'); ?> *</label>
+                    <input type="text" id="nombre" name="nombre" 
                            value="<?php echo htmlspecialchars($valores['nombre']); ?>"
-                           maxlength="200"
-                           required 
-                           autofocus>
+                           maxlength="200" required autofocus>
                 </div>
                 
-                <!-- ===== Descripción ===== -->
                 <div class="form-group">
                     <label for="descripcion"><?php echo traducir('Descripción'); ?></label>
-                    <textarea id="descripcion" 
-                              name="descripcion" 
-                              rows="3"><?php echo htmlspecialchars($valores['descripcion']); ?></textarea>
+                    <textarea id="descripcion" name="descripcion" rows="3"><?php echo htmlspecialchars($valores['descripcion']); ?></textarea>
                 </div>
                 
-                <!-- ===== Fechas ===== -->
+                <!-- ===== Propuesta técnica (PDF) ===== -->
+                <div class="form-group">
+                    <label><?php echo $_SESSION['idioma'] == 'pt' ? 'Proposta Técnica (PDF)' : 'Propuesta Técnica (PDF)'; ?></label>
+                    
+                    <?php if ($proyecto['propuesta_tecnica']): ?>
+                        <!-- Archivo actual -->
+                        <div class="archivo-actual">
+                            <div class="archivo-info">
+                                <span class="archivo-icono">📄</span>
+                                <div>
+                                    <div class="archivo-nombre">
+                                        <?php echo htmlspecialchars($proyecto['propuesta_nombre_original'] ?? 'propuesta.pdf'); ?>
+                                    </div>
+                                    <div class="archivo-meta">
+                                        <?php echo getTamañoArchivo($proyecto['propuesta_tecnica']); ?>
+                                        <?php if ($proyecto['propuesta_fecha_subida']): ?>
+                                            · <?php echo formatearFecha($proyecto['propuesta_fecha_subida']); ?>
+                                        <?php endif; ?>
+                                        <?php if ($proyecto['propuesta_subida_por_nombre']): ?>
+                                            · <?php echo htmlspecialchars($proyecto['propuesta_subida_por_nombre']); ?>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="archivo-acciones">
+                                <a href="<?php echo getUrlArchivo($proyecto['propuesta_tecnica']); ?>" 
+                                   target="_blank" 
+                                   class="btn-secondary btn-sm">
+                                    👁 <?php echo $_SESSION['idioma'] == 'pt' ? 'Ver' : 'Ver'; ?>
+                                </a>
+                                <label class="checkbox-eliminar">
+                                    <input type="checkbox" name="eliminar_pdf" value="1" 
+                                           onchange="toggleEliminar(this)">
+                                    <?php echo $_SESSION['idioma'] == 'pt' ? 'Excluir' : 'Eliminar'; ?>
+                                </label>
+                            </div>
+                        </div>
+                        <div style="margin-top:0.75rem; font-size:0.85rem; color:#7f8c8d;">
+                            <?php echo $_SESSION['idioma'] == 'pt' 
+                                ? 'Para substituir, selecione um novo arquivo abaixo:' 
+                                : 'Para reemplazar, seleccione un nuevo archivo abajo:'; ?>
+                        </div>
+                    <?php endif; ?>
+                    
+                    <!-- Input para subir nuevo archivo -->
+                    <div class="file-upload-wrapper" style="margin-top:0.5rem;">
+                        <input type="file" 
+                               id="propuesta_tecnica" 
+                               name="propuesta_tecnica" 
+                               accept="application/pdf,.pdf"
+                               class="file-input">
+                        <div class="file-upload-info">
+                            <span class="file-name" id="file-name">
+                                <?php echo $proyecto['propuesta_tecnica'] 
+                                    ? ($_SESSION['idioma'] == 'pt' ? 'Selecione para substituir' : 'Seleccione para reemplazar')
+                                    : ($_SESSION['idioma'] == 'pt' ? 'Nenhum arquivo selecionado' : 'Ningún archivo seleccionado'); ?>
+                            </span>
+                            <span class="file-hint"><?php echo $_SESSION['idioma'] == 'pt' ? 'Máx. 20 MB, apenas PDF' : 'Máx. 20 MB, solo PDF'; ?></span>
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="form-row">
                     <div class="form-group">
                         <label for="fecha_inicio"><?php echo traducir('Fecha Inicio'); ?> *</label>
-                        <input type="date" 
-                               id="fecha_inicio" 
-                               name="fecha_inicio" 
-                               value="<?php echo htmlspecialchars($valores['fecha_inicio']); ?>" 
-                               required>
+                        <input type="date" id="fecha_inicio" name="fecha_inicio" 
+                               value="<?php echo htmlspecialchars($valores['fecha_inicio']); ?>" required>
                     </div>
-                    
                     <div class="form-group">
                         <label for="fecha_fin"><?php echo traducir('Fecha Fin'); ?> *</label>
-                        <input type="date" 
-                               id="fecha_fin" 
-                               name="fecha_fin" 
-                               value="<?php echo htmlspecialchars($valores['fecha_fin']); ?>" 
-                               required>
+                        <input type="date" id="fecha_fin" name="fecha_fin" 
+                               value="<?php echo htmlspecialchars($valores['fecha_fin']); ?>" required>
                     </div>
                 </div>
                 
-                <!-- ===== Estado actual + Selector ===== -->
                 <div class="form-row">
                     <div class="form-group">
                         <label for="estado">
@@ -297,17 +339,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 </small>
                             <?php endif; ?>
                         </label>
-                        
-                        <!-- Mostrar estado actual como badge -->
                         <div style="margin-bottom:0.5rem;">
                             <span class="estado-badge estado-<?php echo $proyecto['estado']; ?>">
                                 <?php echo $estados[$proyecto['estado']] ?? $proyecto['estado']; ?>
                             </span>
                         </div>
-                        
-                        <select id="estado" 
-                                name="estado" 
-                                <?php echo !$puede_cambiar_estado ? 'disabled' : ''; ?>>
+                        <select id="estado" name="estado" <?php echo !$puede_cambiar_estado ? 'disabled' : ''; ?>>
                             <?php foreach ($estados as $key => $value): ?>
                                 <option value="<?php echo $key; ?>" 
                                     <?php echo $valores['estado'] == $key ? 'selected' : ''; ?>>
@@ -315,77 +352,39 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 </option>
                             <?php endforeach; ?>
                         </select>
-                        
                         <?php if (!$puede_cambiar_estado): ?>
                             <input type="hidden" name="estado" value="<?php echo htmlspecialchars($valores['estado']); ?>">
-                            <small style="color:#7f8c8d; display:block; margin-top:0.25rem;">
-                                <?php echo $_SESSION['idioma'] == 'pt' 
-                                    ? 'Apenas diretores e gerentes podem alterar o status.'
-                                    : 'Solo directivos y gerenciadores pueden cambiar el estado.'; ?>
-                            </small>
-                        <?php endif; ?>
-                        
-                        <?php if ($puede_cambiar_estado && $valores['estado'] !== $proyecto['estado']): ?>
-                            <small style="color:#e67e22; display:block; margin-top:0.25rem; font-weight:600;">
-                                ⚠ <?php echo $_SESSION['idioma'] == 'pt' 
-                                    ? 'O status será alterado ao salvar.'
-                                    : 'El estado será cambiado al guardar.'; ?>
-                            </small>
                         <?php endif; ?>
                     </div>
-                    
                     <div class="form-group">
                         <label for="fecha_aprobacion"><?php echo traducir('Fecha Aprobación'); ?></label>
-                        <input type="date" 
-                               id="fecha_aprobacion" 
-                               name="fecha_aprobacion" 
+                        <input type="date" id="fecha_aprobacion" name="fecha_aprobacion" 
                                value="<?php echo htmlspecialchars($valores['fecha_aprobacion'] ?? ''); ?>">
                     </div>
                 </div>
                 
-                <!-- ===== Orden de Compra + Encargado ===== -->
                 <div class="form-row">
                     <div class="form-group">
                         <label for="orden_compra"><?php echo traducir('Número de Orden de Compra'); ?></label>
-                        <input type="text" 
-                               id="orden_compra" 
-                               name="orden_compra" 
+                        <input type="text" id="orden_compra" name="orden_compra" 
                                value="<?php echo htmlspecialchars($valores['orden_compra'] ?? ''); ?>"
-                               placeholder="<?php echo $_SESSION['idioma'] == 'pt' ? 'Ex: OC-2026-001' : 'Ej: OC-2026-001'; ?>"
                                maxlength="50">
                     </div>
-                    
                     <div class="form-group">
-                        <label for="encargado_id">
-                            <?php echo traducir('Encargado del Proyecto'); ?>
-                        </label>
+                        <label for="encargado_id"><?php echo traducir('Encargado del Proyecto'); ?></label>
                         <select id="encargado_id" name="encargado_id">
                             <option value="">-- <?php echo traducir('Seleccione un encargado'); ?> --</option>
                             <?php foreach ($encargados_disponibles as $enc): ?>
                                 <option value="<?php echo $enc['id']; ?>"
-                                    <?php echo ($valores['encargado_id'] == $enc['id']) ? 'selected' : ''; ?>>
+                                    <?php echo $valores['encargado_id'] == $enc['id'] ? 'selected' : ''; ?>>
                                     <?php echo htmlspecialchars($enc['nombre_completo']); ?>
                                     (<?php echo traducir(ucfirst($enc['tipo_usuario'])); ?>)
                                 </option>
                             <?php endforeach; ?>
                         </select>
-                        <small style="color:#7f8c8d; display:block; margin-top:0.25rem;">
-                            <?php echo $_SESSION['idioma'] == 'pt'
-                                ? 'O responsável receberá notificações sobre mudanças nos itens.'
-                                : 'El encargado recibirá notificaciones sobre cambios en los items.'; ?>
-                        </small>
                     </div>
                 </div>
                 
-                <!-- ===== Advertencia si cambia a aprobado por cliente ===== -->
-                <?php if ($puede_cambiar_estado): ?>
-                <div id="aviso-aprobado" style="display:none;" class="info-message">
-                    <strong>⚠ <?php echo $_SESSION['idioma'] == 'pt' ? 'Atenção:' : 'Atención:'; ?></strong>
-                    <span id="aviso-aprobado-texto"></span>
-                </div>
-                <?php endif; ?>
-                
-                <!-- ===== Botones ===== -->
                 <div class="form-actions">
                     <button type="submit" class="btn-primary">
                         💾 <?php echo traducir('Actualizar'); ?>
@@ -399,11 +398,47 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     </div>
     
     <script>
-    // Validación cliente: fecha_fin >= fecha_inicio
+    const fileInput = document.getElementById('propuesta_tecnica');
+    const fileName = document.getElementById('file-name');
+    
+    if (fileInput) {
+        fileInput.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                const file = this.files[0];
+                
+                if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+                    alert('<?php echo $_SESSION['idioma'] == 'pt' ? 'Apenas arquivos PDF são permitidos' : 'Solo se permiten archivos PDF'; ?>');
+                    this.value = '';
+                    return;
+                }
+                
+                if (file.size > 20 * 1024 * 1024) {
+                    alert('<?php echo $_SESSION['idioma'] == 'pt' ? 'O arquivo excede 20 MB' : 'El archivo supera 20 MB'; ?>');
+                    this.value = '';
+                    return;
+                }
+                
+                fileName.textContent = '📄 ' + file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + ' MB)';
+                fileName.style.color = '#27ae60';
+                fileName.style.fontWeight = '600';
+            }
+        });
+    }
+    
+    function toggleEliminar(checkbox) {
+        const archivoActual = document.querySelector('.archivo-actual');
+        if (checkbox.checked) {
+            archivoActual.style.opacity = '0.4';
+            archivoActual.style.textDecoration = 'line-through';
+        } else {
+            archivoActual.style.opacity = '1';
+            archivoActual.style.textDecoration = 'none';
+        }
+    }
+    
     document.getElementById('form-proyecto').addEventListener('submit', function(e) {
         const inicio = document.getElementById('fecha_inicio').value;
         const fin = document.getElementById('fecha_fin').value;
-        const aprob = document.getElementById('fecha_aprobacion').value;
         
         if (inicio && fin && fin < inicio) {
             e.preventDefault();
@@ -412,56 +447,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 : "La fecha de fin no puede ser anterior a la fecha de inicio."; ?>');
             return false;
         }
-        
-        if (inicio && aprob && aprob < inicio) {
-            e.preventDefault();
-            alert('<?php echo $_SESSION["idioma"] == "pt" 
-                ? "A data de aprovação não pode ser anterior à data de início." 
-                : "La fecha de aprobación no puede ser anterior a la fecha de inicio."; ?>');
-            return false;
-        }
     });
-    
-    // Auto-ajustar fecha_fin cuando cambia fecha_inicio
-    document.getElementById('fecha_inicio').addEventListener('change', function() {
-        const fin = document.getElementById('fecha_fin');
-        if (fin.value && fin.value < this.value) {
-            fin.value = this.value;
-        }
-    });
-    
-    // Detectar cambio a "aprovado_cliente"
-    <?php if ($puede_cambiar_estado): ?>
-    const estadoSelect = document.getElementById('estado');
-    const aviso = document.getElementById('aviso-aprobado');
-    const avisoTexto = document.getElementById('aviso-aprobado-texto');
-    const estadoOriginal = '<?php echo $proyecto['estado']; ?>';
-    const idioma = '<?php echo $_SESSION['idioma']; ?>';
-    
-    function verificarCambioEstado() {
-        const nuevoEstado = estadoSelect.value;
-        
-        if (nuevoEstado === 'aprovado_cliente' && estadoOriginal !== 'aprovado_cliente') {
-            avisoTexto.textContent = idioma === 'pt'
-                ? 'Ao salvar, todos os itens "Solicitado" deste projeto passarão automaticamente para "Pendente".'
-                : 'Al guardar, todos los items "Solicitado" de este proyecto pasarán automáticamente a "Pendiente".';
-            aviso.style.display = 'block';
-        } else if (nuevoEstado !== 'aprovado_cliente' && estadoOriginal === 'aprovado_cliente') {
-            avisoTexto.textContent = idioma === 'pt'
-                ? 'Você está revertendo o status de "Aprovado pelo Cliente".'
-                : 'Estás revirtiendo el estado de "Aprobado por Cliente".';
-            aviso.style.display = 'block';
-        } else {
-            aviso.style.display = 'none';
-        }
-    }
-    
-    estadoSelect.addEventListener('change', verificarCambioEstado);
-    verificarCambioEstado();
-    <?php endif; ?>
     </script>
     
-
+    <script src="<?php echo url('assets/js/notificaciones.js'); ?>"></script>
     
     <?php include '../../includes/footer.php'; ?>
 </body>

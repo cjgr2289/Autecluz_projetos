@@ -58,14 +58,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $errores[] = 'La transición no es válida. Marca "Forzar transición" si estás seguro.';
     }
     
-    // Validar cantidad_stock si el estado es "stock"
     if ($nuevo_estado === 'stock') {
         if ($cantidad_stock_nueva < 0 || $cantidad_stock_nueva > $item['cantidad']) {
             $errores[] = 'La cantidad en stock debe estar entre 0 y ' . $item['cantidad'];
         }
     }
     
-    // Validar cantidad_entregada si el estado es "entregado"
     if ($nuevo_estado === 'entregado') {
         if ($cantidad_entregada_nueva < 1 || $cantidad_entregada_nueva > $item['cantidad_stock']) {
             $errores[] = 'La cantidad a entregar debe estar entre 1 y ' . $item['cantidad_stock'];
@@ -130,10 +128,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
             $db->commit();
             
-            // Notificar a los destinatarios
+            // ============================================
+            // NOTIFICAR POR EMAIL AL CAMBIAR EL ESTADO
+            // ============================================
             if ($estado_anterior !== $nuevo_estado) {
                 try {
-                    notificarCambioEstadoItem(
+                    // Log para depuración
+                    error_log("=== NOTIFICANDO CAMBIO DE ESTADO ===");
+                    error_log("Item ID: $item_id");
+                    error_log("Estado: $estado_anterior -> $nuevo_estado");
+                    error_log("Usuario: " . $_SESSION['usuario_id']);
+                    
+                    $resultado = notificarCambioEstadoItem(
                         $db, 
                         $item_id, 
                         $estado_anterior, 
@@ -141,6 +147,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $_SESSION['usuario_id'], 
                         $comentario
                     );
+                    
+                    error_log("Resultado notificación: " . ($resultado ? 'OK' : 'FALLÓ'));
+                    
                 } catch (Exception $e) {
                     error_log("Error al enviar email de cambio de estado: " . $e->getMessage());
                 }
@@ -200,25 +209,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         </span>
                     <?php endif; ?>
                 </p>
-                <p style="margin:0.5rem 0 0 0; font-size:0.9rem;">
-                    <strong><?php echo traducir('Cantidad solicitada'); ?>:</strong>
-                    <?php echo $item['cantidad']; ?>
-                    <?php if ($item['cantidad_stock'] > 0): ?>
-                        &nbsp;|&nbsp;
-                        <strong><?php echo traducir('En Stock'); ?>:</strong>
-                        <span style="color:#27ae60; font-weight:bold;"><?php echo $item['cantidad_stock']; ?></span>
-                        <?php if ($item['cantidad_stock'] < $item['cantidad']): ?>
-                            &nbsp;|&nbsp;
-                            <strong><?php echo traducir('Falta'); ?>:</strong>
-                            <span style="color:#e74c3c; font-weight:bold;"><?php echo $item['cantidad'] - $item['cantidad_stock']; ?></span>
-                        <?php endif; ?>
-                    <?php endif; ?>
-                    <?php if ($item['cantidad_entregada'] > 0): ?>
-                        &nbsp;|&nbsp;
-                        <strong><?php echo traducir('Entregado'); ?>:</strong>
-                        <span style="color:#3498db; font-weight:bold;"><?php echo $item['cantidad_entregada']; ?></span>
-                    <?php endif; ?>
-                </p>
             </div>
             
             <?php if (!empty($errores)): ?>
@@ -238,20 +228,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <option value="">-- <?php echo traducir('Seleccionar'); ?> --</option>
                         <?php foreach ($estados_permitidos as $key => $value): 
                             $es_sugerido = ($key === $siguiente_estado);
-                            $es_actual = ($key === $item['estado']);
                         ?>
                             <option value="<?php echo $key; ?>" 
                                     data-es-sugerido="<?php echo $es_sugerido ? '1' : '0'; ?>"
                                     <?php echo $es_sugerido ? 'style="font-weight:bold;"' : ''; ?>>
                                 <?php echo $value; ?>
                                 <?php if ($es_sugerido): ?> ⭐<?php endif; ?>
-                                <?php if ($es_actual): ?> (<?php echo traducir('actual'); ?>)<?php endif; ?>
+                                <?php if ($key === $item['estado']): ?> (<?php echo traducir('actual'); ?>)<?php endif; ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 
-                <!-- Cantidad en Stock (solo si cambia a "stock") -->
+                <!-- Cantidad en Stock -->
                 <div class="form-group" id="grupo-stock" style="display:none;">
                     <label for="cantidad_stock">
                         <?php echo traducir('Cantidad en Stock'); ?>
@@ -266,12 +255,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <small style="color:#7f8c8d; display:block; margin-top:0.25rem;">
                         <?php echo traducir('Cantidad disponible'); ?>: 
                         máximo <?php echo $item['cantidad']; ?>.
-                        <?php echo traducir('Si es menor, el resto quedará como'); ?> 
-                        <em><?php echo traducir('Falta por comprar'); ?></em>.
                     </small>
                 </div>
                 
-                <!-- Cantidad a Entregar (solo si cambia a "entregado") -->
+                <!-- Cantidad a Entregar -->
                 <div class="form-group" id="grupo-entrega" style="display:none;">
                     <label for="cantidad_entregada">
                         <?php echo traducir('Cantidad a entregar'); ?>
@@ -283,10 +270,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                            min="1" 
                            max="<?php echo $item['cantidad_stock'] > 0 ? $item['cantidad_stock'] : $item['cantidad']; ?>"
                            step="1">
-                    <small style="color:#7f8c8d; display:block; margin-top:0.25rem;">
-                        <?php echo traducir('Entrega parcial'); ?>: 
-                        puedes entregar menos de lo disponible.
-                    </small>
                 </div>
                 
                 <div id="aviso-transicion" style="display:none; margin-bottom:1rem; padding:0.85rem 1rem; background:#fff3cd; border-left:4px solid #f39c12; border-radius:4px; font-size:0.88rem;">
@@ -337,11 +320,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     function validarEstado() {
         const nuevoEstado = selectEstado.value;
         
-        // Mostrar/ocultar campos según el estado
         grupoStock.style.display = (nuevoEstado === 'stock') ? 'block' : 'none';
         grupoEntrega.style.display = (nuevoEstado === 'entregado') ? 'block' : 'none';
         
-        // Validar transición
         if (!nuevoEstado || nuevoEstado === ESTADO_ACTUAL) {
             aviso.style.display = 'none';
             return;
@@ -365,7 +346,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
     </script>
     
-
+    <script src="<?php echo url('assets/js/notificaciones.js'); ?>"></script>
     
     <?php include '../../includes/footer.php'; ?>
 </body>

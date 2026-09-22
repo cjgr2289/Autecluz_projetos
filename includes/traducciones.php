@@ -240,6 +240,15 @@ function traducir($texto) {
                 'Nueva Contraseña' => 'Nueva Contraseña',
                 'Confirmar Nueva Contraseña' => 'Confirmar Nueva Contraseña',
 
+                'Ver PDF' => 'Ver PDF',
+                'Descargar' => 'Descargar',
+                'Propuesta Técnica' => 'Propuesta Técnica',
+                'Descargar archivo' => 'Descargar archivo',
+                'Ver en el navegador' => 'Ver en el navegador',
+                'Subido el' => 'Subido el',
+                'Sin propuesta' => 'Sin propuesta',
+                'Archivo no encontrado' => 'Archivo no encontrado',
+
             ],
             'pt' => [
                 // ===== General / Nav =====
@@ -465,6 +474,15 @@ function traducir($texto) {
                 'Contraseña actual' => 'Senha atual',
                 'Nueva Contraseña' => 'Nova Senha',
                 'Confirmar Nueva Contraseña' => 'Confirmar Nova Senha',
+
+                'Ver PDF' => 'Ver PDF',
+                'Descargar' => 'Baixar',
+                'Propuesta Técnica' => 'Proposta Técnica',
+                'Descargar archivo' => 'Baixar arquivo',
+                'Ver en el navegador' => 'Ver no navegador',
+                'Subido el' => 'Enviado em',
+                'Sin propuesta' => 'Sem proposta',
+                'Archivo no encontrado' => 'Arquivo não encontrado',
             ]
         ];
     }

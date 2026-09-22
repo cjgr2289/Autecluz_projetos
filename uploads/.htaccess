@@ -1,0 +1,7 @@
+# Bloquear ejecución de scripts en la carpeta uploads
+<FilesMatch "\.(php|phtml|php3|php4|php5|php7|phps|pl|py|jsp|asp|htm|shtml|sh|cgi)$">
+    Require all denied
+</FilesMatch>
+
+# Bloquear listado
+Options -Indexes

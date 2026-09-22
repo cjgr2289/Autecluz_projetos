@@ -12,9 +12,14 @@ if (!$proyecto_id) {
 }
 
 // Datos del proyecto
-$stmt = $db->prepare("SELECT p.*, u.nombre_completo as creador 
+$stmt = $db->prepare("SELECT p.*, 
+                             u.nombre_completo as creador,
+                             e.nombre_completo as encargado_nombre,
+                             us.nombre_completo as propuesta_subida_por_nombre
                       FROM proyectos p 
                       LEFT JOIN usuarios u ON p.usuario_creacion = u.id 
+                      LEFT JOIN usuarios e ON p.encargado_id = e.id
+                      LEFT JOIN usuarios us ON p.propuesta_subida_por = us.id
                       WHERE p.id = ?");
 $stmt->execute([$proyecto_id]);
 $proyecto = $stmt->fetch();
@@ -71,7 +76,20 @@ foreach ($items as $it) {
     if ($it['estado'] === 'entregado') $items_entregados++;
     if ($it['estado'] === 'recibido') $items_recibidos++;
 }
+
 ?>
+<?php if ($proyecto['propuesta_tecnica']): ?>
+<div class="meta-item">
+    <span class="meta-icon">📄</span>
+    <span class="meta-label"><?php echo $_SESSION['idioma'] == 'pt' ? 'Proposta' : 'Propuesta'; ?>:</span>
+    <a href="<?php echo getUrlArchivo($proyecto['propuesta_tecnica']); ?>" 
+       target="_blank" 
+       class="btn-ver-pdf"
+       title="<?php echo htmlspecialchars($proyecto['propuesta_nombre_original'] ?? ''); ?>">
+        📄 <?php echo $_SESSION['idioma'] == 'pt' ? 'Ver PDF' : 'Ver PDF'; ?>
+    </a>
+</div>
+<?php endif; ?>
 <!DOCTYPE html>
 <html lang="<?php echo $_SESSION['idioma'] ?? 'es'; ?>">
 <head>
@@ -95,6 +113,24 @@ foreach ($items as $it) {
 </head>
 <body>
     <?php include '../../includes/header.php'; ?>
+
+    <?php if (isset($_GET['error'])): ?>
+    <div class="container" style="margin-top:1rem;">
+        <?php if ($_GET['error'] === 'sin_propuesta'): ?>
+            <div class="error-message">
+                ⚠ <?php echo $_SESSION['idioma'] == 'pt' 
+                    ? 'Este projeto não tem proposta técnica.' 
+                    : 'Este proyecto no tiene propuesta técnica.'; ?>
+            </div>
+        <?php elseif ($_GET['error'] === 'archivo_no_encontrado'): ?>
+            <div class="error-message">
+                ⚠ <?php echo $_SESSION['idioma'] == 'pt' 
+                    ? 'O arquivo da proposta não foi encontrado no servidor.' 
+                    : 'El archivo de la propuesta no fue encontrado en el servidor.'; ?>
+            </div>
+        <?php endif; ?>
+    </div>
+<?php endif; ?>
     
     <div class="container">
         
@@ -150,38 +186,94 @@ foreach ($items as $it) {
                 </div>
             </div>
             
-            <!-- Meta info compacta en una sola línea -->
-            <div class="proyecto-meta-bar">
-                <div class="meta-item">
-                    <span class="meta-icon">📅</span>
-                    <span class="meta-label"><?php echo traducir('Inicio'); ?>:</span>
-                    <strong><?php echo formatearFecha($proyecto['fecha_inicio']); ?></strong>
-                </div>
-                <div class="meta-item">
-                    <span class="meta-icon">🏁</span>
-                    <span class="meta-label"><?php echo traducir('Fin'); ?>:</span>
-                    <strong><?php echo formatearFecha($proyecto['fecha_fin']); ?></strong>
-                </div>
-                <?php if ($proyecto['fecha_aprobacion']): ?>
-                <div class="meta-item">
-                    <span class="meta-icon">✅</span>
-                    <span class="meta-label"><?php echo traducir('Apr'); ?>:</span>
-                    <strong><?php echo formatearFecha($proyecto['fecha_aprobacion']); ?></strong>
-                </div>
-                <?php endif; ?>
-                <?php if ($proyecto['orden_compra']): ?>
-                <div class="meta-item">
-                    <span class="meta-icon">📄</span>
-                    <span class="meta-label">O.C.:</span>
-                    <span class="badge-oc"><?php echo htmlspecialchars($proyecto['orden_compra']); ?></span>
-                </div>
-                <?php endif; ?>
-                <div class="meta-item">
-                    <span class="meta-icon">👤</span>
-                    <span class="meta-label"><?php echo traducir('Creado por'); ?>:</span>
-                    <strong><?php echo htmlspecialchars($proyecto['creador'] ?? '-'); ?></strong>
-                </div>
-            </div>
+<!-- Meta info compacta en una sola línea -->
+<div class="proyecto-meta-bar">
+    <div class="meta-item">
+        <span class="meta-icon">📅</span>
+        <span class="meta-label"><?php echo traducir('Inicio'); ?>:</span>
+        <strong><?php echo formatearFecha($proyecto['fecha_inicio']); ?></strong>
+    </div>
+    <div class="meta-item">
+        <span class="meta-icon">🏁</span>
+        <span class="meta-label"><?php echo traducir('Fin'); ?>:</span>
+        <strong><?php echo formatearFecha($proyecto['fecha_fin']); ?></strong>
+    </div>
+    <?php if ($proyecto['fecha_aprobacion']): ?>
+    <div class="meta-item">
+        <span class="meta-icon">✅</span>
+        <span class="meta-label"><?php echo traducir('Apr'); ?>:</span>
+        <strong><?php echo formatearFecha($proyecto['fecha_aprobacion']); ?></strong>
+    </div>
+    <?php endif; ?>
+    <?php if ($proyecto['orden_compra']): ?>
+    <div class="meta-item">
+        <span class="meta-icon">📄</span>
+        <span class="meta-label">O.C.:</span>
+        <span class="badge-oc"><?php echo htmlspecialchars($proyecto['orden_compra']); ?></span>
+    </div>
+    <?php endif; ?>
+    <div class="meta-item">
+        <span class="meta-icon">👤</span>
+        <span class="meta-label"><?php echo traducir('Creado por'); ?>:</span>
+        <strong><?php echo htmlspecialchars($proyecto['creador'] ?? '-'); ?></strong>
+    </div>
+    
+    <?php if (!empty($proyecto['encargado_nombre'])): ?>
+    <div class="meta-item">
+        <span class="meta-icon">🎯</span>
+        <span class="meta-label"><?php echo traducir('Encargado'); ?>:</span>
+        <strong><?php echo htmlspecialchars($proyecto['encargado_nombre']); ?></strong>
+    </div>
+    <?php endif; ?>
+</div>
+
+<!-- ============================================
+     PROPUESTA TÉCNICA (PDF)
+     ============================================ -->
+<?php if (!empty($proyecto['propuesta_tecnica'])): ?>
+<div class="propuesta-tecnica-box">
+    <div class="propuesta-icono">📄</div>
+    <div class="propuesta-info">
+        <div class="propuesta-titulo">
+            <?php echo $_SESSION['idioma'] == 'pt' ? 'Proposta Técnica' : 'Propuesta Técnica'; ?>
+        </div>
+        <div class="propuesta-nombre">
+            <?php echo htmlspecialchars($proyecto['propuesta_nombre_original'] ?? 'propuesta.pdf'); ?>
+        </div>
+        <?php if (!empty($proyecto['propuesta_fecha_subida'])): ?>
+        <div class="propuesta-meta">
+            <?php echo $_SESSION['idioma'] == 'pt' ? 'Enviado em' : 'Subido el'; ?>
+            <?php echo formatearFechaHora($proyecto['propuesta_fecha_subida']); ?>
+        </div>
+        <?php endif; ?>
+    </div>
+    <div class="propuesta-acciones">
+        <!-- Botón Ver -->
+        <a href="<?php echo url('modules/proyectos/ver_propuesta.php?id=' . $proyecto_id); ?>" 
+           target="_blank" 
+           class="btn-propuesta btn-propuesta-ver"
+           title="<?php echo $_SESSION['idioma'] == 'pt' ? 'Ver no navegador' : 'Ver en el navegador'; ?>">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+            </svg>
+            <?php echo $_SESSION['idioma'] == 'pt' ? 'Ver PDF' : 'Ver PDF'; ?>
+        </a>
+        
+        <!-- Botón Descargar -->
+        <a href="<?php echo url('modules/proyectos/descargar_propuesta.php?id=' . $proyecto_id); ?>" 
+           class="btn-propuesta btn-propuesta-descargar"
+           title="<?php echo $_SESSION['idioma'] == 'pt' ? 'Baixar arquivo' : 'Descargar archivo'; ?>">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            <?php echo $_SESSION['idioma'] == 'pt' ? 'Baixar' : 'Descargar'; ?>
+        </a>
+    </div>
+</div>
+<?php endif; ?>
             
             <!-- Descripción colapsable -->
             <?php if (!empty($proyecto['descripcion'])): ?>

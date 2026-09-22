@@ -593,3 +593,122 @@
     from { opacity: 0; transform: translateY(-4px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* ============================================
+   PROPUESTA TÉCNICA (PDF)
+   ============================================ */
+.propuesta-tecnica-box {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    margin-top: 1rem;
+    background: linear-gradient(135deg, #e3f2fd 0%, #f0f7ff 100%);
+    border: 1px solid #bbdefb;
+    border-left: 4px solid #1976d2;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.propuesta-tecnica-box:hover {
+    box-shadow: 0 4px 12px rgba(25, 118, 210, 0.15);
+}
+
+.propuesta-icono {
+    font-size: 2.2rem;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.propuesta-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.propuesta-titulo {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #1565c0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.15rem;
+}
+
+.propuesta-nombre {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: #0d47a1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.propuesta-meta {
+    font-size: 0.75rem;
+    color: #5c6bc0;
+    margin-top: 0.15rem;
+}
+
+.propuesta-acciones {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.btn-propuesta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.55rem 0.9rem;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 0.82rem;
+    font-weight: 600;
+    transition: all 0.15s;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.btn-propuesta svg {
+    flex-shrink: 0;
+}
+
+.btn-propuesta-ver {
+    background: #1976d2;
+    color: white;
+}
+
+.btn-propuesta-ver:hover {
+    background: #1565c0;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(25, 118, 210, 0.3);
+}
+
+.btn-propuesta-descargar {
+    background: white;
+    color: #1976d2;
+    border: 1px solid #90caf9;
+}
+
+.btn-propuesta-descargar:hover {
+    background: #e3f2fd;
+    border-color: #1976d2;
+    transform: translateY(-1px);
+}
+
+@media (max-width: 640px) {
+    .propuesta-tecnica-box {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .propuesta-acciones {
+        width: 100%;
+    }
+    
+    .btn-propuesta {
+        flex: 1;
+        justify-content: center;
+    }
+}

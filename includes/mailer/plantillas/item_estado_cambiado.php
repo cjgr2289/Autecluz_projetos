@@ -1,7 +1,7 @@
 <?php
 /**
  * Plantilla: Notificación de cambio de estado de un item
- * Variables: $idioma, $item, $estado_anterior, $estado_nuevo, $usuario_cambio, $comentario
+ * Variables: $idioma, $item, $estado_anterior, $estado_nuevo, $usuario_cambio, $comentario, $url_proyecto
  */
 
 $t = function($es, $pt) use ($idioma) {
@@ -20,12 +20,14 @@ $t = function($es, $pt) use ($idioma) {
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:8px; overflow:hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.08);">
                     
+                    <!-- Header -->
                     <tr>
                         <td style="background:#3498db; padding: 24px 30px; color:#ffffff;">
                             <h1 style="margin:0; font-size: 20px;">🔄 <?php echo $t('Actualización de estado', 'Atualização de status'); ?></h1>
                         </td>
                     </tr>
                     
+                    <!-- Body -->
                     <tr>
                         <td style="padding: 30px;">
                             <p style="margin:0 0 15px 0; font-size: 15px; color:#333;">
@@ -60,9 +62,19 @@ $t = function($es, $pt) use ($idioma) {
                                 <strong><?php echo $t('Comentario', 'Comentário'); ?>:</strong> <?php echo htmlspecialchars($comentario); ?>
                             </div>
                             <?php endif; ?>
+                            
+                            <?php if (!empty($url_proyecto)): ?>
+                            <div style="text-align: center; margin-top: 30px;">
+                                <a href="<?php echo htmlspecialchars($url_proyecto); ?>" 
+                                   style="display: inline-block; background:#3498db; color:#ffffff; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 14px;">
+                                    <?php echo $t('Ver Proyecto', 'Ver Projeto'); ?>
+                                </a>
+                            </div>
+                            <?php endif; ?>
                         </td>
                     </tr>
                     
+                    <!-- Footer -->
                     <tr>
                         <td style="background:#f8f9fa; padding: 15px 30px; font-size: 12px; color:#95a5a6; text-align: center;">
                             <?php echo $t('Sistema de Proyectos - Notificación automática', 'Sistema de Projetos - Notificação automática'); ?>

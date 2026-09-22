@@ -22,3 +22,4 @@ require_once __DIR__ . '/notificaciones_helper.php';
 require_once __DIR__ . '/reportes_helper.php';
 require_once __DIR__ . '/iconos.php';
 require_once __DIR__ . '/mailer/funciones_mail.php';
+require_once __DIR__ . '/uploads_helper.php';
