@@ -1,0 +1,643 @@
+ Sistema de Proyectos — Informe Técnico Completo
+1. Descripción General
+Sistema de Proyectos es una aplicación web desarrollada en PHP + MySQL + JavaScript que permite gestionar el ciclo de vida completo de proyectos industriales, desde su creación hasta su finalización, incluyendo:
+
+Gestión de proyectos con estados, fechas, clientes y responsables
+
+Catálogo de productos y materiales con precios y márgenes
+
+Items por proyecto con seguimiento detallado de estados (compra, entrega, recepción)
+
+Propuestas técnicas (PDF) y propuestas económicas (con cálculo de precios)
+
+Múltiples roles de usuario con visibilidad diferenciada por estado
+
+Sistema de notificaciones por email y panel visual
+
+Multilenguaje (Español / Português Brasil)
+
+Reportes (items por estado, entregas, costos)
+
+Empresa: Autecluz Soluções Industriais LTDA
+Uso: Interno (gestión de proyectos industriales)
+
+2. Stack Tecnológico
+Capa	Tecnología
+Backend	PHP 7.4+ (sin frameworks, PHP nativo)
+Base de datos	MySQL 5.7+ / MariaDB 10.3+
+Frontend	HTML5, CSS3, JavaScript (Vanilla, sin frameworks)
+Servidor web	Apache (XAMPP en local, hosting en producción)
+Acceso a datos	PDO con prepared statements
+Envío de emails	PHPMailer (SMTP)
+URLs	Compatible con localhost (subcarpeta) y hosting (raíz)
+3. Estructura de Carpetas
+text
+sistema_proyectos/
+│
+├── assets/                     # Recursos estáticos
+│   ├── css/                    # Hojas de estilo (una por módulo)
+│   │   ├── style.css           # Variables CSS + reset + layout base
+│   │   ├── navbar.css          # Header y menú de usuario
+│   │   ├── formularios.css     # Inputs, botones, file upload
+│   │   ├── tablas.css          # Estilos base de tablas
+│   │   ├── badges.css          # Estados y etiquetas
+│   │   ├── mensajes.css        # Success/error/info messages
+│   │   ├── dashboard.css       # Dashboard y tarjetas de stats
+│   │   ├── proyectos.css       # Módulo de proyectos
+│   │   ├── items.css           # Tabla de items + historial
+│   │   ├── modal.css           # Modal de productos
+│   │   ├── productos.css       # Módulo de productos
+│   │   ├── usuarios.css        # Gestión de usuarios
+│   │   ├── reportes.css        # Reportes e impresión
+│   │   ├── propuestas.css      # Propuestas económicas
+│   │   ├── ui.css              # Toasts, modales, dropdowns
+│   │   ├── notificaciones.css  # Panel de notificaciones
+│   │   ├── login.css           # Pantalla de login
+│   │   └── footer.css          # Footer + sticky layout
+│   │
+│   ├── js/                     # JavaScript
+│   │   ├── ui.js               # Toasts, modales, dropdowns, menú usuario
+│   │   ├── script.js           # Scripts generales
+│   │   ├── modal_productos.js  # Modal para agregar items a proyecto
+│   │   └── notificaciones.js   # Panel de notificaciones
+│   │
+│   └── images/                 # Imágenes (logo, iconos, etc.)
+│
+├── config/                     # Configuración
+│   ├── database.php            # Conexión PDO (Singleton, local + hosting)
+│   └── mailer.php              # Configuración SMTP
+│
+├── includes/                   # Librerías internas y utilidades
+│   │
+│   ├── functions.php           # Cargador central de submódulos
+│   │
+│   ├── # Módulos de funcionalidad
+│   ├── rutas.php               # URLs dinámicas (localhost/hosting)
+│   ├── sesion.php              # Sesiones, permisos, roles
+│   ├── traducciones.php        # Sistema de traducción ES/PT
+│   ├── estados.php             # Catálogos de estados de proyectos/items
+│   ├── unidades.php            # Catálogo de unidades de medida
+│   ├── formatos.php            # Formateo de fechas, números, texto
+│   ├── iconos.php              # Iconos SVG inline
+│   ├── uploads_helper.php      # Subida y gestión de PDFs
+│   ├── productos_helper.php    # Helpers del catálogo de productos
+│   ├── clientes_helper.php     # Helpers de clientes y responsables
+│   ├── propuestas_helper.php   # Cálculos de propuestas económicas
+│   ├── reportes_helper.php     # Estadísticas para reportes
+│   ├── proyectos_helper.php    # Visibilidad y categorización de proyectos
+│   ├── notificaciones_helper.php # Lógica del panel de notificaciones
+│   │
+│   ├── # Layout
+│   ├── header.php              # Header HTML + navbar + panel notificaciones
+│   └── footer.php              # Footer + scripts comunes
+│   │
+│   └── mailer/                 # Sistema de correos
+│       ├── Mailer.php          # Wrapper sobre PHPMailer
+│       ├── funciones_mail.php  # Funciones de alto nivel para emails
+│       └── plantillas/         # Plantillas HTML de email
+│           ├── item_agregado.php
+│           ├── item_editado.php
+│           ├── item_estado_cambiado.php
+│           ├── usuario_creado.php
+│           └── resumen_semanal.php
+│
+├── lib/                        # Librerías de terceros
+│   └── PHPMailer/
+│       └── src/                # Exception.php, PHPMailer.php, SMTP.php
+│
+├── logs/                       # Logs del sistema
+│   ├── emails.log              # Registro de envíos de email
+│   └── conexion.log            # (Opcional) Log de conexión a BD
+│
+├── modules/                    # Módulos funcionales
+│   │
+│   ├── login/
+│   │   ├── login.php           # Pantalla y lógica de login
+│   │   └── logout.php          # Cerrar sesión
+│   │
+│   ├── dashboard/              # (reservado, actualmente en /index.php)
+│   │
+│   ├── perfil/
+│   │   └── cambiar_password.php # Cambio de contraseña (con soporte "forzado")
+│   │
+│   ├── proyectos/
+│   │   ├── index.php           # Listado agrupado por categoría
+│   │   ├── crear.php           # Crear proyecto
+│   │   ├── editar.php          # Editar proyecto (con cliente y fechas)
+│   │   ├── ver.php             # Vista detalle del proyecto
+│   │   ├── eliminar.php        # Eliminar proyecto
+│   │   ├── ver_propuesta.php   # Servir PDF inline
+│   │   ├── descargar_propuesta.php # Forzar descarga del PDF
+│   │   ├── reporte.php         # Items por estado
+│   │   ├── reporte_entrega.php # Comprobante de entrega
+│   │   ├── reporte_costos.php  # Reporte financiero
+│   │   ├── editar_costos.php   # Captura de costos por item
+│   │   ├── agregar_item.php    # Endpoint AJAX (un item)
+│   │   ├── agregar_items_lote.php # Endpoint AJAX (lote)
+│   │   │
+│   │   └── propuestas/         # Propuestas económicas
+│   │       ├── index.php       # Listado por proyecto
+│   │       ├── crear.php       # Crear propuesta
+│   │       ├── editar.php      # Editar propuesta
+│   │       ├── ver.php         # Vista previa
+│   │       ├── imprimir.php    # Vista de impresión
+│   │       └── eliminar.php    # Eliminar propuesta
+│   │
+│   ├── items/
+│   │   ├── editar.php          # Editar item
+│   │   ├── eliminar.php        # Eliminar item
+│   │   └── actualizar_estado.php # Cambiar estado (con validación de transiciones)
+│   │
+│   ├── productos/
+│   │   ├── index.php           # Listado con costo y lucro
+│   │   ├── crear.php           # Crear producto
+│   │   ├── editar.php          # Editar producto
+│   │   ├── eliminar.php        # Eliminar (soft delete)
+│   │   ├── buscar_ajax.php     # Búsqueda para el modal
+│   │   ├── crear_ajax.php      # Crear producto desde el modal
+│   │   └── categorias_ajax.php # Listar categorías
+│   │
+│   ├── categorias/
+│   │   ├── index.php           # Listado + crear
+│   │   ├── editar.php          # Editar categoría
+│   │   └── eliminar.php        # Soft delete
+│   │
+│   ├── clientes/
+│   │   ├── index.php           # Listado de clientes
+│   │   ├── crear.php           # Crear cliente
+│   │   ├── editar.php          # Editar cliente
+│   │   ├── ver.php             # Ver cliente + responsables + proyectos
+│   │   ├── eliminar.php        # Soft delete
+│   │   ├── responsables.php    # CRUD de responsables del cliente
+│   │   └── buscar_responsables_ajax.php # Cargar responsables por cliente
+│   │
+│   ├── usuarios/
+│   │   ├── index.php           # Listado (solo Master)
+│   │   ├── crear.php           # Crear usuario (solo Master)
+│   │   ├── editar.php          # Editar usuario (solo Master)
+│   │   ├── eliminar.php        # Eliminar usuario (solo Master)
+│   │   └── cambiar_idioma.php  # Cambiar idioma (cualquier usuario)
+│   │
+│   └── notificaciones/
+│       ├── obtener.php         # AJAX: devuelve notificaciones
+│       └── marcar_leida.php    # AJAX: marcar como leída
+│
+├── uploads/                    # Archivos subidos por el usuario
+│   ├── .htaccess               # Bloquea ejecución de scripts
+│   └── propuestas/             # PDFs de propuestas técnicas
+│       ├── .htaccess           # Solo permite acceso a PDFs
+│       └── propuesta_*.pdf
+│
+├── sql/                        # Scripts SQL
+│   ├── database.sql            # Esquema inicial
+│   ├── migracion_costos.sql
+│   ├── migracion_notificaciones.sql
+│   ├── migracion_propuesta_tecnica.sql
+│   ├── migracion_separado_encargado.sql
+│   ├── migracion_propuestas_economicas.sql
+│   └── migracion_clientes_fechas.sql
+│
+├── cron/                       # Tareas programadas
+│   └── resumen_semanal.php     # Envía resumen semanal (lunes 8 AM)
+│
+├── index.php                   # Dashboard (solo proyectos activos)
+├── .htaccess                   # Reglas de Apache (URLs, seguridad)
+└── README.md                   # Documentación del proyecto
+4. Base de Datos
+4.1 Tablas principales
+Tabla	Descripción
+usuarios	Usuarios del sistema con roles y idioma preferido
+proyectos	Proyectos con cliente, encargado, fechas, estados
+items_proyecto	Materiales requeridos por proyecto
+historial_proyectos	Auditoría de cambios de estado del proyecto
+historial_items	Auditoría de cambios de items (estado, cantidad, costo)
+productos	Catálogo de productos (con costo y % lucro)
+categorias	Categorías de productos
+clientes	Clientes con datos fiscales y de contacto
+clientes_responsables	Contactos/solicitantes de cada cliente
+propuestas_economicas	Propuestas con totales y condiciones
+propuestas_items	Items de cada propuesta
+notificaciones_leidas	Estado de lectura de notificaciones
+correlativos	Numeración automática (ej: PROP-2026-0001)
+4.2 Relaciones clave
+text
+usuarios ──┬──> proyectos (creador, encargado)
+           ├──> items_proyecto (por historial)
+           └──> propuestas_economicas (creador)
+
+proyectos ──┬──> items_proyecto (1:N)
+            ├──> historial_proyectos (1:N)
+            ├──> propuestas_economicas (1:N)
+            ├──> clientes (N:1)
+            └──> clientes_responsables (N:1)
+
+items_proyecto ──┬──> productos (N:1)
+                 └──> historial_items (1:N)
+
+productos ──┬──> categorias (N:1)
+            └──> items_proyecto (1:N)
+
+clientes ──┬──> clientes_responsables (1:N)
+           └──> proyectos (1:N)
+5. Roles y Permisos
+5.1 Tipos de usuario
+Rol	Descripción
+Master	Administrador supremo — ve y hace todo
+Directivo	Alta dirección — ve todos los proyectos
+Gerenciador	Gerente de proyecto — ve todos los proyectos
+Compras	Departamento de compras — ve activos, culminados, finalizados
+Almacén	Almacén — solo ve proyectos activos (comprando/elaboración)
+Supervisor	Encargado del proyecto — ve según creador/encargado
+Proyectista	Proyectistas — ve según creador/encargado
+5.2 Matriz de visibilidad de proyectos
+Rol	Preparación	Activos	Culminados	Finalizados	Rechazados
+Master	✅	✅	✅	✅	✅
+Directivo / Gerenciador	✅	✅	✅	✅	✅
+Compras	❌	✅	✅	✅	✅
+Almacén	❌	✅ (solo comprando/elaboración)	❌	❌	❌
+Supervisor / Proyectista	Solo si es creador	Si es creador o encargado	❌	❌	❌
+5.3 Categorías de proyectos (por estado)
+Categoría	Estados	Icono
+En Preparación	solicitado, orçado, pendente_aprovacion_cliente, aprovado_cliente, espera_orden_compra	📝
+Activos	comprando_materiales, elaboracion	🚀
+Culminados	terminado, pendiente_cobro_cliente	📦
+Finalizados	finalizado	✅
+Rechazados	rechazado	❌
+5.4 Visibilidad de items
+Los items de un proyecto NO se ven hasta que el proyecto esté aprobado por el cliente (estado aprovado_cliente o posterior), excepto para Master, Directivo, Gerenciador, y el creador (supervisor/proyectista) que sí los ven en cualquier estado.
+
+6. Estados del Sistema
+6.1 Estados de proyecto
+text
+solicitado → orçado → pendente_aprovacion_cliente → aprovado_cliente
+   → espera_orden_compra → comprando_materiales → elaboracion 
+   → terminado → pendiente_cobro_cliente → finalizado
+   
+   (rechazado es un estado aparte)
+6.2 Estados de item
+text
+solicitado → pendiente → cotacion → orçado → pendiente_pago 
+   → comprado_llegar → llego → stock (parcial o total) → separado 
+   → entregado → recibido
+Reglas automáticas:
+
+Cuando el proyecto pasa a aprovado_cliente, los items solicitado pasan automáticamente a pendiente.
+
+Los items pendiente no se pueden asignar manualmente (es automático).
+
+6.3 Transiciones válidas de items
+Cada estado tiene transiciones permitidas. Si se intenta una transición no permitida, se requiere marcar "Forzar transición" y se registra en el historial con la marca [TRANSICIÓN FORZADA].
+
+7. Funcionalidades Clave
+7.1 Módulo de Proyectos
+Crear/editar proyectos con fecha de solicitud, cliente, responsable, fechas de ejecución, orden de compra, encargado
+
+Estados controlados por directivo/gerenciador
+
+Categorización automática por estado
+
+Historial completo de cambios
+
+Adjuntar propuesta técnica (PDF)
+
+Vista compacta con chips de información
+
+7.2 Módulo de Items
+Agregar items vía modal con búsqueda en catálogo
+
+Crear productos desde el modal sin salir
+
+Estados con validación de transiciones
+
+Stock parcial (cantidad en stock vs. cantidad total)
+
+Entregas parciales
+
+Historial de cambios (estado, cantidad, costo)
+
+Trazabilidad de entrega/recepción
+
+7.3 Módulo de Productos
+Catálogo con categorías
+
+Costo actual y porcentaje de lucro
+
+Propagar costos desde proyectos
+
+Unidades de medida predefinidas
+
+7.4 Módulo de Clientes
+CRUD de clientes con datos fiscales
+
+Múltiples responsables por cliente
+
+Cada responsable con cargo, email, teléfonos
+
+7.5 Módulo de Propuestas Económicas
+Cálculo de precio de venta = costo × (1 + % lucro)
+
+Mano de obra por horas o por días
+
+Descuentos e impuestos
+
+Estados: borrador, enviada, aprobada, rechazada
+
+Impresión con formato Autecluz
+
+Numeración automática
+
+7.6 Módulo de Notificaciones
+Panel visual con items vencidos, próximos, modificados, agregados, separados
+
+Envío de emails:
+
+Al agregar items a un proyecto → a encargado + compras + almacén
+
+Al cambiar estado de un item → a encargado + compras + almacén
+
+Al editar un item → con tabla "antes/después"
+
+Al crear usuario → con credenciales
+
+Resumen semanal (lunes 8 AM) → a compras + directivo + gerenciador
+
+7.7 Módulo de Reportes
+Items por estado: agrupados por estado con totales
+
+Comprobante de entrega: formato imprimible para firmar
+
+Costos: análisis financiero por estado y categoría
+
+Editar costos: captura de costos por item con propagación al catálogo
+
+8. Sistema de Rutas Dinámicas
+El sistema detecta automáticamente si está en localhost o en hosting:
+
+php
+getBaseUrl()  // https://localhost/sistema_proyectos/ o https://projetos.autecluz.com/
+url('ruta')   // Genera URL absoluta correcta
+redirigir()   // Redirección con URL correcta
+path()        // Solo el path (sin dominio)
+Estrategia: compara rutas físicas (__FILE__ vs DOCUMENT_ROOT) para calcular la subcarpeta del proyecto.
+
+9. Sistema de Traducciones
+Todas las cadenas visibles pasan por traducir('Clave') que devuelve el texto en el idioma actual ($_SESSION['idioma']).
+
+Idiomas soportados:
+
+🇪🇸 Español (es)
+
+🇧🇷 Português Brasil (pt)
+
+Funciones de formato:
+
+formatearFecha() → dd/mm/yyyy
+
+formatearFechaHora() → dd/mm/yyyy HH:ii
+
+formatearMoneda() → $ 1.234,56
+
+getUnidadLabel() → devuelve la etiqueta completa de una unidad
+
+10. Sistema de UI (JavaScript)
+10.1 Toast — Notificaciones flotantes
+javascript
+Toast.success('Mensaje');
+Toast.error('Mensaje');
+Toast.warning('Mensaje');
+Toast.info('Mensaje');
+10.2 Confirm — Modal de confirmación
+javascript
+const ok = await Confirm.show({
+    titulo: 'Eliminar',
+    mensaje: '¿Estás seguro?',
+    tipo: 'danger'
+});
+if (ok) { /* ... */ }
+10.3 toggleDropdown() — Dropdowns genéricos
+javascript
+toggleDropdown(event, 'id-del-menu');
+10.4 toggleUserMenu() — Menú de usuario
+javascript
+toggleUserMenu(event);
+11. Sistema de Correos
+Configuración: config/mailer.php
+
+Host: mail.autecluz.com
+
+Puerto: 465 (SSL)
+
+Cuenta: gestionProjeto@autecluz.com
+
+Clase Mailer: wrapper de PHPMailer con logs.
+
+Funciones de alto nivel (en funciones_mail.php):
+
+notificarItemsAgregados()
+
+notificarCambioEstadoItem()
+
+notificarItemEditado()
+
+notificarUsuarioCreado()
+
+enviarResumenSemanal()
+
+Plantillas HTML en includes/mailer/plantillas/ con diseño responsive y soporte ES/PT.
+
+Cron job (cron/resumen_semanal.php) → Programable para lunes 8 AM.
+
+12. Seguridad
+Medida	Implementación
+Contraseñas	password_hash() bcrypt
+Sesiones	session_start() + verificación en cada página
+SQL Injection	PDO con prepared statements
+XSS	htmlspecialchars() en toda salida
+CSRF	(Recomendado agregar tokens, no implementado)
+Uploads	Validación de MIME + extensión + cabecera %PDF-
+.htaccess	Bloquea config/, includes/, lib/, cron/, sql/, logs/
+Uploads protegidos	uploads/.htaccess bloquea scripts
+13. Entornos Soportados
+Local (Desarrollo)
+URL: https://localhost/sistema_proyectos/
+
+BD: sistema_proyectos en localhost
+
+Usuario: root sin password
+
+Producción (Hosting)
+URL: https://projetos.autecluz.com/
+
+BD: Autecluz_projetos en 186.209.113.99
+
+Usuario: autecluz_carlosgomez
+
+Detección automática: config/database.php intenta local primero, luego hosting.
+
+14. Flujo de Trabajo Típico
+text
+1. PROYECTISTA/SUPERVISOR crea proyecto
+   → Estado: solicitado
+   → Datos: nombre, cliente, solicitante, fecha solicitud
+   → Adjunta propuesta técnica (PDF)
+   → Items se cargan pero quedan OCULTOS para compras/almacén
+
+2. DIRECTIVO/GERENCIADOR gestiona estados
+   → orçado → pendente_aprovacion_cliente
+   → Cuando cliente aprueba → aprovado_cliente
+     → Se piden fechas de inicio y fin
+     → Items pasan automáticamente a "pendiente"
+     → Items se hacen VISIBLES para compras/almacén
+
+3. COMPRAS gestiona items
+   → cotacion → orçado → pendiente_pago → comprado_llegar
+   → Captura costos desde editar_costos.php
+   → Propaga costos al catálogo de productos
+
+4. ALMACÉN recibe materiales
+   → llego → stock (con cantidad parcial si aplica)
+   → separado (listos para entrega)
+   → entregado (parcial o total) → recibido
+
+5. DIRECTIVO avanza el proyecto
+   → comprando_materiales → elaboracion → terminado
+   → pendiente_cobro_cliente → finalizado
+
+6. PROPUESTA ECONÓMICA (paralelo)
+   → Calcular materiales + mano de obra + márgenes
+   → Imprimir y enviar al cliente
+15. Comandos y Tareas Útiles
+Ejecutar migración SQL
+bash
+mysql -u root -p sistema_proyectos < sql/migracion_xxx.sql
+Ejecutar resumen semanal manualmente
+bash
+C:\xampp\php\php.exe C:\xampp\htdocs\sistema_proyectos\cron\resumen_semanal.php
+Ver logs de email
+bash
+type C:\xampp\htdocs\sistema_proyectos\logs\emails.log
+Ver logs de Apache
+bash
+type C:\xampp\apache\logs\error.log
+Buscar duplicados de scripts JS
+cmd
+findstr /S /I /C:"ui.js" C:\xampp\htdocs\sistema_proyectos\*.php
+findstr /S /I /C:"notificaciones.js" C:\xampp\htdocs\sistema_proyectos\*.php
+16. Puntos de Extensión
+Agregar un nuevo rol de usuario
+Modificar ENUM en BD: ALTER TABLE usuarios MODIFY tipo_usuario ENUM(...)
+
+Agregar traducción en includes/traducciones.php
+
+Agregar <option> en modules/usuarios/crear.php y editar.php
+
+Actualizar matriz de permisos en tienePermiso([...]) donde corresponda
+
+Si tiene visibilidad especial, actualizar puedeVerProyecto() en includes/proyectos_helper.php
+
+Agregar un nuevo estado de proyecto
+Modificar ENUM: ALTER TABLE proyectos MODIFY estado ENUM(...)
+
+Agregar a getEstadosProyecto() en includes/estados.php
+
+Agregar a la categoría correspondiente en getCategoriasProyecto()
+
+Actualizar visibilidad si aplica
+
+Agregar un nuevo estado de item
+Modificar ENUM: ALTER TABLE items_proyecto MODIFY estado ENUM(...)
+
+Agregar a getEstadosItem() en includes/estados.php
+
+Agregar transiciones válidas en getTransicionesValidasItem()
+
+Agregar CSS en assets/css/badges.css
+
+Actualizar getEstadosItemParaIdioma() en funciones_mail.php
+
+Agregar un nuevo tipo de reporte
+Crear modules/proyectos/reporte_xxx.php
+
+Agregar enlace en el dropdown de reportes en ver.php
+
+Reutilizar renderEncabezadoReporte() de reportes_helper.php
+
+Usar @media print en el CSS
+
+17. Estado Actual del Proyecto
+Completado ✅
+Login, logout, gestión de sesiones
+
+CRUD de usuarios (solo Master)
+
+CRUD de proyectos con cliente y encargado
+
+Visibilidad diferenciada por rol y estado
+
+CRUD de items con validación de transiciones
+
+Catálogo de productos con costos y lucro
+
+Categorías de productos
+
+CRUD de clientes y responsables
+
+Propuestas técnicas (PDF)
+
+Propuestas económicas
+
+Notificaciones visuales
+
+Emails automáticos (agregar items, cambio estado, nuevo usuario, item editado)
+
+Resumen semanal (cron)
+
+Reportes (items por estado, entrega, costos)
+
+Multilenguaje ES/PT
+
+Dashboard con proyectos activos
+
+Sistema de rutas dinámicas (localhost + hosting)
+
+Toasts, modales, dropdowns
+
+Pendiente / Mejoras futuras 🚧
+CSRF tokens
+
+Recuperación de contraseña por email
+
+API REST para integraciones
+
+Exportar reportes a Excel/PDF
+
+Gráficos en dashboard
+
+Adjuntar archivos adicionales (planos, permisos)
+
+Comparar 2 propuestas
+
+Envío de propuesta por email al cliente
+
+Firma digital del cliente
+
+Versionado de propuestas
+
+Numeración automática de proyectos
+
+18. Notas de Mantenimiento
+Cada vez que se agrega un CSS o JS nuevo, debe ir en includes/header.php con url().
+
+Cada script JS debe cargarse UNA SOLA VEZ (en header.php). Las páginas individuales NO deben recargarlo.
+
+Los require_once de PHP van siempre al inicio del archivo, después de functions.php.
+
+Los redirigir() son preferibles a header('Location: ...') directos.
+
+Los archivos subidos van a uploads/propuestas/ con nombre único.
+
+Toda la lógica de visibilidad de proyectos está centralizada en includes/proyectos_helper.php.
+
+Los emails usan plantillas HTML en includes/mailer/plantillas/.
+
+Los logs están en logs/ y en C:\xampp\apache\logs\error.log.
