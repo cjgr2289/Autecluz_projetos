@@ -24,3 +24,5 @@ require_once __DIR__ . '/iconos.php';
 require_once __DIR__ . '/mailer/funciones_mail.php';
 require_once __DIR__ . '/uploads_helper.php';
 require_once __DIR__ . '/propuestas_helper.php';
+require_once __DIR__ . '/clientes_helper.php';
+require_once __DIR__ . '/proyectos_helper.php';

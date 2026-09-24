@@ -11,16 +11,27 @@ if (!$proyecto_id) {
     redirigir('modules/proyectos/index.php');
 }
 
-// Datos del proyecto (con encargado y datos de propuesta técnica)
-$stmt = $db->prepare("SELECT p.*, 
-                             u.nombre_completo as creador,
-                             e.nombre_completo as encargado_nombre,
-                             us.nombre_completo as propuesta_subida_por_nombre
-                      FROM proyectos p 
-                      LEFT JOIN usuarios u ON p.usuario_creacion = u.id 
-                      LEFT JOIN usuarios e ON p.encargado_id = e.id
-                      LEFT JOIN usuarios us ON p.propuesta_subida_por = us.id
-                      WHERE p.id = ?");
+// Datos del proyecto con cliente, responsable, encargado y propuesta técnica
+$stmt = $db->prepare("
+    SELECT p.*, 
+           u.nombre_completo as creador,
+           e.nombre_completo as encargado_nombre,
+           us.nombre_completo as propuesta_subida_por_nombre,
+           c.nombre as cliente_nombre,
+           c.razon_social as cliente_razon_social,
+           cr.nombre as responsable_nombre,
+           cr.cargo as responsable_cargo,
+           cr.telefono as responsable_telefono,
+           cr.celular as responsable_celular,
+           cr.email as responsable_email
+    FROM proyectos p 
+    LEFT JOIN usuarios u ON p.usuario_creacion = u.id 
+    LEFT JOIN usuarios e ON p.encargado_id = e.id
+    LEFT JOIN usuarios us ON p.propuesta_subida_por = us.id
+    LEFT JOIN clientes c ON p.cliente_id = c.id
+    LEFT JOIN clientes_responsables cr ON p.cliente_responsable_id = cr.id
+    WHERE p.id = ?
+");
 $stmt->execute([$proyecto_id]);
 $proyecto = $stmt->fetch();
 
@@ -28,15 +39,65 @@ if (!$proyecto) {
     redirigir('modules/proyectos/index.php');
 }
 
-// Items con info del producto y categoría
-$stmt = $db->prepare("SELECT i.*, p.nombre as producto_nombre, c.nombre as categoria_nombre
-                      FROM items_proyecto i 
-                      LEFT JOIN productos p ON i.producto_id = p.id
-                      LEFT JOIN categorias c ON p.categoria_id = c.id
-                      WHERE i.proyecto_id = ? 
-                      ORDER BY i.fecha_requerida ASC, i.fecha_creacion DESC");
-$stmt->execute([$proyecto_id]);
-$items = $stmt->fetchAll();
+// Verificar permisos de acceso
+if (!puedeVerProyecto($proyecto)) {
+    redirigir('modules/proyectos/index.php?error=sin_acceso');
+}
+
+// ============================================
+// CONTROL DE VISIBILIDAD DE ITEMS
+// ============================================
+$tipo_usuario = $_SESSION['tipo_usuario'] ?? '';
+$es_master = esMaster();
+$es_directivo = in_array($tipo_usuario, ['directivo', 'gerenciador']);
+$es_creador = in_array($tipo_usuario, ['supervisor', 'proyectista']);
+$es_compras_almacen = in_array($tipo_usuario, ['compras', 'almacen']);
+
+$estados_visibles_compras = [
+    'aprovado_cliente', 'espera_orden_compra', 'comprando_materiales',
+    'elaboracion', 'terminado', 'pendiente_cobro_cliente', 'finalizado'
+];
+
+$puede_ver_items = false;
+$motivo_oculto = '';
+
+if ($es_master) {
+    $puede_ver_items = true;
+} elseif ($es_directivo) {
+    // Directivos ven todo siempre
+    $puede_ver_items = true;
+} elseif ($es_creador) {
+    // Supervisores/proyectistas ven items excepto si el proyecto fue rechazado
+    if ($proyecto['estado'] === 'rechazado') {
+        $puede_ver_items = false;
+        $motivo_oculto = 'rechazado';
+    } else {
+        $puede_ver_items = true;
+    }
+} elseif ($es_compras_almacen) {
+    // Compras y almacén solo ven items si el proyecto está aprobado por cliente o posterior
+    if (in_array($proyecto['estado'], $estados_visibles_compras)) {
+        $puede_ver_items = true;
+    } else {
+        $puede_ver_items = false;
+        $motivo_oculto = 'no_aprobado';
+    }
+}
+
+// ============================================
+// CARGAR ITEMS (solo si tiene permiso)
+// ============================================
+$items = [];
+if ($puede_ver_items) {
+    $stmt = $db->prepare("SELECT i.*, p.nombre as producto_nombre, c.nombre as categoria_nombre
+                          FROM items_proyecto i 
+                          LEFT JOIN productos p ON i.producto_id = p.id
+                          LEFT JOIN categorias c ON p.categoria_id = c.id
+                          WHERE i.proyecto_id = ? 
+                          ORDER BY i.fecha_requerida ASC, i.fecha_creacion DESC");
+    $stmt->execute([$proyecto_id]);
+    $items = $stmt->fetchAll();
+}
 
 // Historial de proyecto
 $stmt = $db->prepare("SELECT h.*, u.nombre_completo as usuario 
@@ -47,26 +108,30 @@ $stmt = $db->prepare("SELECT h.*, u.nombre_completo as usuario
 $stmt->execute([$proyecto_id]);
 $historial = $stmt->fetchAll();
 
-// Historial de items (últimos cambios)
-$stmt = $db->prepare("SELECT hi.*, u.nombre_completo as usuario, i.nombre_item
-                      FROM historial_items hi 
-                      LEFT JOIN usuarios u ON hi.usuario_id = u.id
-                      LEFT JOIN items_proyecto i ON hi.item_id = i.id
-                      WHERE i.proyecto_id = ? 
-                      ORDER BY hi.fecha_cambio DESC
-                      LIMIT 50");
-$stmt->execute([$proyecto_id]);
-$historial_items = $stmt->fetchAll();
+// Historial de items (solo si puede ver items)
+$historial_items = [];
+if ($puede_ver_items) {
+    $stmt = $db->prepare("SELECT hi.*, u.nombre_completo as usuario, i.nombre_item
+                          FROM historial_items hi 
+                          LEFT JOIN usuarios u ON hi.usuario_id = u.id
+                          LEFT JOIN items_proyecto i ON hi.item_id = i.id
+                          WHERE i.proyecto_id = ? 
+                          ORDER BY hi.fecha_cambio DESC
+                          LIMIT 50");
+    $stmt->execute([$proyecto_id]);
+    $historial_items = $stmt->fetchAll();
+}
 
-// Contar propuestas económicas del proyecto
+// Contar propuestas económicas
 $stmt = $db->prepare("SELECT COUNT(*) as total FROM propuestas_economicas WHERE proyecto_id = ?");
 $stmt->execute([$proyecto_id]);
 $total_propuestas = $stmt->fetch()['total'];
 
 $estados_proyecto = getEstadosProyecto();
 $estados_item = getEstadosItem();
-$puede_agregar_items = tienePermiso(['compras', 'directivo', 'gerenciador', 'supervisor', 'proyectista', 'almacen']) || esMaster();
-$puede_cambiar_estado_item = tienePermiso(['compras', 'directivo', 'gerenciador', 'almacen']) || esMaster();
+
+$puede_agregar_items = $puede_ver_items && (tienePermiso(['compras', 'directivo', 'gerenciador', 'supervisor', 'proyectista', 'almacen']) || esMaster());
+$puede_cambiar_estado_item = $puede_ver_items && (tienePermiso(['compras', 'directivo', 'gerenciador', 'almacen']) || esMaster());
 $puede_editar_proyecto = tienePermiso(['directivo', 'gerenciador', 'proyectista']) || esMaster();
 $puede_crear_propuesta = tienePermiso(['directivo', 'gerenciador']) || esMaster();
 
@@ -83,7 +148,6 @@ foreach ($items as $it) {
     if ($it['estado'] === 'recibido') $items_recibidos++;
 }
 
-// Mensaje de error (si viene de endpoints)
 $error_msg = $_GET['error'] ?? '';
 ?>
 <!DOCTYPE html>
@@ -93,7 +157,6 @@ $error_msg = $_GET['error'] ?? '';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars($proyecto['nombre']); ?> - Sistema</title>
     
-    <!-- CSS modular completo -->
     <link rel="stylesheet" href="<?php echo url('assets/css/style.css'); ?>">
     <link rel="stylesheet" href="<?php echo url('assets/css/navbar.css'); ?>">
     <link rel="stylesheet" href="<?php echo url('assets/css/formularios.css'); ?>">
@@ -112,7 +175,6 @@ $error_msg = $_GET['error'] ?? '';
     
     <div class="container">
         
-        <!-- Mensajes de error -->
         <?php if ($error_msg === 'sin_propuesta'): ?>
             <div class="error-message" style="margin-bottom:1rem;">
                 ⚠ <?php echo $_SESSION['idioma'] == 'pt' 
@@ -128,134 +190,199 @@ $error_msg = $_GET['error'] ?? '';
         <?php endif; ?>
         
         <!-- ============================================
-             HEADER DEL PROYECTO
-             ============================================ -->
-        <div class="proyecto-header">
-            <div class="proyecto-header-top">
-                <div class="proyecto-header-title">
-                    <h1><?php echo htmlspecialchars($proyecto['nombre']); ?></h1>
-                    <span class="estado-badge estado-<?php echo $proyecto['estado']; ?>">
-                        <?php echo $estados_proyecto[$proyecto['estado']] ?? $proyecto['estado']; ?>
+        HEADER DEL PROYECTO
+        ============================================ -->
+    <div class="proyecto-header">
+        
+        <!-- ===== Título y acciones ===== -->
+        <div class="proyecto-header-top">
+            <div class="proyecto-header-title">
+                <h1><?php echo htmlspecialchars($proyecto['nombre']); ?></h1>
+                <span class="estado-badge estado-<?php echo $proyecto['estado']; ?>">
+                    <?php echo $estados_proyecto[$proyecto['estado']] ?? $proyecto['estado']; ?>
+                </span>
+            </div>
+            
+            <div class="proyecto-header-actions">
+                <a href="<?php echo url('modules/proyectos/index.php'); ?>" class="btn-secondary btn-sm">
+                    ← <?php echo traducir('Volver'); ?>
+                </a>
+                
+                <?php if ($puede_editar_proyecto): ?>
+                    <a href="<?php echo url('modules/proyectos/editar.php?id=' . $proyecto_id); ?>" 
+                    class="btn-secondary btn-sm">
+                        ✎ <?php echo $_SESSION['idioma'] == 'pt' ? 'Editar' : 'Editar'; ?>
+                    </a>
+                <?php endif; ?>
+                
+                <!-- Dropdown: Reportes -->
+                <div class="dropdown-acciones">
+                    <button type="button" class="btn-secondary btn-sm" onclick="toggleDropdown(event, 'dropdown-reportes')">
+                        📊 <?php echo $_SESSION['idioma'] == 'pt' ? 'Relatórios' : 'Reportes'; ?> ▾
+                    </button>
+                    <div class="dropdown-menu" id="dropdown-reportes">
+                        <a href="<?php echo url('modules/proyectos/reporte.php?id=' . $proyecto_id); ?>">
+                            📋 <?php echo $_SESSION['idioma'] == 'pt' ? 'Itens por Status' : 'Items por Estado'; ?>
+                        </a>
+                        <a href="<?php echo url('modules/proyectos/reporte_entrega.php?id=' . $proyecto_id); ?>">
+                            📦 <?php echo $_SESSION['idioma'] == 'pt' ? 'Entrega de Materiais' : 'Entrega de Materiales'; ?>
+                        </a>
+                        <a href="<?php echo url('modules/proyectos/reporte_costos.php?id=' . $proyecto_id); ?>">
+                            💰 <?php echo $_SESSION['idioma'] == 'pt' ? 'Custos' : 'Costos'; ?>
+                        </a>
+                        <a href="<?php echo url('modules/proyectos/editar_costos.php?id=' . $proyecto_id); ?>">
+                            ✎ <?php echo $_SESSION['idioma'] == 'pt' ? 'Editar Custos' : 'Editar Costos'; ?>
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Dropdown: Propuestas Económicas -->
+                <div class="dropdown-acciones">
+                    <button type="button" class="btn-propuesta-dropdown" onclick="toggleDropdown(event, 'dropdown-propuestas')">
+                        💼 <?php echo $_SESSION['idioma'] == 'pt' ? 'Propostas' : 'Propuestas'; ?>
+                        <?php if ($total_propuestas > 0): ?>
+                            <span class="badge-count"><?php echo $total_propuestas; ?></span>
+                        <?php endif; ?>
+                        ▾
+                    </button>
+                    <div class="dropdown-menu" id="dropdown-propuestas">
+                        <a href="<?php echo url('modules/proyectos/propuestas/index.php?proyecto=' . $proyecto_id); ?>" class="dropdown-item-destacado">
+                            📋 <?php echo $_SESSION['idioma'] == 'pt' ? 'Ver todas as propostas' : 'Ver todas las propuestas'; ?>
+                            <?php if ($total_propuestas > 0): ?>
+                                <span class="dropdown-badge"><?php echo $total_propuestas; ?></span>
+                            <?php endif; ?>
+                        </a>
+                        <?php if ($puede_crear_propuesta): ?>
+                            <div class="dropdown-divider"></div>
+                            <a href="<?php echo url('modules/proyectos/propuestas/crear.php?proyecto=' . $proyecto_id); ?>">
+                                ➕ <?php echo $_SESSION['idioma'] == 'pt' ? 'Nova Proposta' : 'Nueva Propuesta'; ?>
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                
+                <?php if ($puede_agregar_items): ?>
+                    <button type="button" class="btn-primary btn-sm" onclick="abrirModalProducto()">
+                        + <?php echo traducir('Agregar Item'); ?>
+                    </button>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <!-- ===== Chips compactas de datos clave ===== -->
+        <div class="proyecto-chips-bar">
+            <span class="chip">
+                <span class="chip-icono">📅</span>
+                <span class="chip-label"><?php echo $_SESSION['idioma'] == 'pt' ? 'Solicitação' : 'Solicitud'; ?>:</span>
+                <strong><?php echo formatearFecha($proyecto['fecha_solicitud']); ?></strong>
+            </span>
+            
+            <?php if ($proyecto['fecha_inicio']): ?>
+            <span class="chip">
+                <span class="chip-icono">🚀</span>
+                <span class="chip-label"><?php echo traducir('Inicio'); ?>:</span>
+                <strong><?php echo formatearFecha($proyecto['fecha_inicio']); ?></strong>
+            </span>
+            <?php endif; ?>
+            
+            <?php if ($proyecto['fecha_fin']): ?>
+            <span class="chip">
+                <span class="chip-icono">🏁</span>
+                <span class="chip-label"><?php echo traducir('Fin'); ?>:</span>
+                <strong><?php echo formatearFecha($proyecto['fecha_fin']); ?></strong>
+            </span>
+            <?php endif; ?>
+            
+            <?php if ($proyecto['fecha_aprobacion']): ?>
+            <span class="chip">
+                <span class="chip-icono">✅</span>
+                <span class="chip-label"><?php echo $_SESSION['idioma'] == 'pt' ? 'Aprovação' : 'Aprobación'; ?>:</span>
+                <strong><?php echo formatearFecha($proyecto['fecha_aprobacion']); ?></strong>
+            </span>
+            <?php endif; ?>
+            
+            <?php if ($proyecto['orden_compra']): ?>
+            <span class="chip chip-oc">
+                <span class="chip-icono">📄</span>
+                <span class="chip-label">O.C.:</span>
+                <strong><?php echo htmlspecialchars($proyecto['orden_compra']); ?></strong>
+            </span>
+            <?php endif; ?>
+            
+            <span class="chip">
+                <span class="chip-icono">👤</span>
+                <span class="chip-label"><?php echo traducir('Creado por'); ?>:</span>
+                <strong><?php echo htmlspecialchars($proyecto['creador'] ?? '-'); ?></strong>
+            </span>
+            
+            <?php if (!empty($proyecto['encargado_nombre'])): ?>
+            <span class="chip chip-encargado">
+                <span class="chip-icono">🎯</span>
+                <span class="chip-label"><?php echo traducir('Encargado'); ?>:</span>
+                <strong><?php echo htmlspecialchars($proyecto['encargado_nombre']); ?></strong>
+            </span>
+            <?php endif; ?>
+        </div>
+        
+        <!-- ===== Cliente / Solicitante en fila compacta ===== -->
+        <?php if ($proyecto['cliente_nombre'] || $proyecto['responsable_nombre']): ?>
+        <div class="proyecto-partes-bar">
+            <?php if ($proyecto['cliente_nombre']): ?>
+            <div class="parte-item">
+                <span class="parte-icono">🏢</span>
+                <div class="parte-info">
+                    <span class="parte-label"><?php echo $_SESSION['idioma'] == 'pt' ? 'Cliente' : 'Cliente'; ?></span>
+                    <span class="parte-valor"><?php echo htmlspecialchars($proyecto['cliente_nombre']); ?></span>
+                    <?php if ($proyecto['cliente_razon_social']): ?>
+                        <span class="parte-extra"><?php echo htmlspecialchars($proyecto['cliente_razon_social']); ?></span>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+            
+            <?php if ($proyecto['responsable_nombre']): ?>
+            <div class="parte-item">
+                <span class="parte-icono">👤</span>
+                <div class="parte-info">
+                    <span class="parte-label"><?php echo $_SESSION['idioma'] == 'pt' ? 'Solicitante' : 'Solicitante'; ?></span>
+                    <span class="parte-valor">
+                        <?php echo htmlspecialchars($proyecto['responsable_nombre']); ?>
+                        <?php if ($proyecto['responsable_cargo']): ?>
+                            <em>(<?php echo htmlspecialchars($proyecto['responsable_cargo']); ?>)</em>
+                        <?php endif; ?>
+                    </span>
+                    <span class="parte-extra">
+                        <?php if ($proyecto['responsable_celular']): ?>
+                            📱 <?php echo htmlspecialchars($proyecto['responsable_celular']); ?>
+                        <?php elseif ($proyecto['responsable_telefono']): ?>
+                            📞 <?php echo htmlspecialchars($proyecto['responsable_telefono']); ?>
+                        <?php endif; ?>
+                        <?php if ($proyecto['responsable_email']): ?>
+                            <?php if ($proyecto['responsable_celular'] || $proyecto['responsable_telefono']): ?> · <?php endif; ?>
+                            ✉️ <?php echo htmlspecialchars($proyecto['responsable_email']); ?>
+                        <?php endif; ?>
                     </span>
                 </div>
-                
-            <div class="proyecto-header-actions">
-            <a href="<?php echo url('modules/proyectos/index.php'); ?>" class="btn-secondary btn-sm">
-                ← <?php echo traducir('Volver'); ?>
-            </a>
-            
-            <?php if ($puede_editar_proyecto): ?>
-                <a href="<?php echo url('modules/proyectos/editar.php?id=' . $proyecto_id); ?>" 
-                class="btn-secondary btn-sm" 
-                title="<?php echo $_SESSION['idioma'] == 'pt' ? 'Editar Projeto' : 'Editar Proyecto'; ?>">
-                    ✎ <?php echo $_SESSION['idioma'] == 'pt' ? 'Editar Projeto' : 'Editar Proyecto'; ?>
-                </a>
-            <?php endif; ?>
-            
-            <!-- ===== DROPDOWN: REPORTES ===== -->
-            <div class="dropdown-acciones">
-                <button type="button" class="btn-secondary btn-sm" onclick="toggleDropdown(event, 'dropdown-reportes')">
-                    📊 <?php echo $_SESSION['idioma'] == 'pt' ? 'Relatórios' : 'Reportes'; ?> ▾
-                </button>
-                <div class="dropdown-menu" id="dropdown-reportes">
-                    <a href="<?php echo url('modules/proyectos/reporte.php?id=' . $proyecto_id); ?>">
-                        📋 <?php echo $_SESSION['idioma'] == 'pt' ? 'Itens por Status' : 'Items por Estado'; ?>
-                    </a>
-                    <a href="<?php echo url('modules/proyectos/reporte_entrega.php?id=' . $proyecto_id); ?>">
-                        📦 <?php echo $_SESSION['idioma'] == 'pt' ? 'Entrega de Materiais' : 'Entrega de Materiales'; ?>
-                    </a>
-                    <a href="<?php echo url('modules/proyectos/reporte_costos.php?id=' . $proyecto_id); ?>">
-                        💰 <?php echo $_SESSION['idioma'] == 'pt' ? 'Custos' : 'Costos'; ?>
-                    </a>
-                    <a href="<?php echo url('modules/proyectos/editar_costos.php?id=' . $proyecto_id); ?>">
-                        ✎ <?php echo $_SESSION['idioma'] == 'pt' ? 'Editar Custos' : 'Editar Costos'; ?>
-                    </a>
-                </div>
             </div>
-            
-            <!-- ===== DROPDOWN: PROPUESTAS ECONÓMICAS ===== -->
-            <div class="dropdown-acciones">
-                <button type="button" class="btn-propuesta-dropdown" onclick="toggleDropdown(event, 'dropdown-propuestas')">
-                    💼 <?php echo $_SESSION['idioma'] == 'pt' ? 'Propostas' : 'Propuestas'; ?>
-                    <?php if ($total_propuestas > 0): ?>
-                        <span class="badge-count"><?php echo $total_propuestas; ?></span>
-                    <?php endif; ?>
-                    ▾
-                </button>
-                <div class="dropdown-menu" id="dropdown-propuestas">
-                    <a href="<?php echo url('modules/proyectos/propuestas/index.php?proyecto=' . $proyecto_id); ?>" class="dropdown-item-destacado">
-                        📋 <?php echo $_SESSION['idioma'] == 'pt' ? 'Ver todas as propostas' : 'Ver todas las propuestas'; ?>
-                        <?php if ($total_propuestas > 0): ?>
-                            <span class="dropdown-badge"><?php echo $total_propuestas; ?></span>
-                        <?php endif; ?>
-                    </a>
-                    
-                    <?php if ($puede_crear_propuesta): ?>
-                        <div class="dropdown-divider"></div>
-                        <a href="<?php echo url('modules/proyectos/propuestas/crear.php?proyecto=' . $proyecto_id); ?>">
-                            ➕ <?php echo $_SESSION['idioma'] == 'pt' ? 'Nova Proposta' : 'Nueva Propuesta'; ?>
-                        </a>
-                    <?php endif; ?>
-                </div>
-            </div>
-            
-            <?php if ($puede_agregar_items): ?>
-                <button type="button" class="btn-primary btn-sm" onclick="abrirModalProducto()">
-                    + <?php echo traducir('Agregar Item'); ?>
-                </button>
             <?php endif; ?>
         </div>
+        <?php endif; ?>
+        
+        <!-- ===== Descripción compacta ===== -->
+        <?php if (!empty($proyecto['descripcion'])): ?>
+        <details class="proyecto-descripcion-compact" <?php echo mb_strlen($proyecto['descripcion']) < 200 ? 'open' : ''; ?>>
+            <summary>
+                <span class="desc-icono">📝</span>
+                <span class="desc-titulo"><?php echo $_SESSION['idioma'] == 'pt' ? 'Descrição do Projeto' : 'Descripción del Proyecto'; ?></span>
+                <span class="desc-preview"><?php echo htmlspecialchars(truncarTexto($proyecto['descripcion'], 80)); ?></span>
+            </summary>
+            <div class="desc-body">
+                <?php echo nl2br(htmlspecialchars($proyecto['descripcion'])); ?>
             </div>
-            
-            <!-- Meta info compacta en una sola línea -->
-            <div class="proyecto-meta-bar">
-                <div class="meta-item">
-                    <span class="meta-icon">📅</span>
-                    <span class="meta-label"><?php echo traducir('Inicio'); ?>:</span>
-                    <strong><?php echo formatearFecha($proyecto['fecha_inicio']); ?></strong>
-                </div>
-                <div class="meta-item">
-                    <span class="meta-icon">🏁</span>
-                    <span class="meta-label"><?php echo traducir('Fin'); ?>:</span>
-                    <strong><?php echo formatearFecha($proyecto['fecha_fin']); ?></strong>
-                </div>
-                <?php if ($proyecto['fecha_aprobacion']): ?>
-                <div class="meta-item">
-                    <span class="meta-icon">✅</span>
-                    <span class="meta-label"><?php echo traducir('Apr'); ?>:</span>
-                    <strong><?php echo formatearFecha($proyecto['fecha_aprobacion']); ?></strong>
-                </div>
-                <?php endif; ?>
-                <?php if ($proyecto['orden_compra']): ?>
-                <div class="meta-item">
-                    <span class="meta-icon">📄</span>
-                    <span class="meta-label">O.C.:</span>
-                    <span class="badge-oc"><?php echo htmlspecialchars($proyecto['orden_compra']); ?></span>
-                </div>
-                <?php endif; ?>
-                <div class="meta-item">
-                    <span class="meta-icon">👤</span>
-                    <span class="meta-label"><?php echo traducir('Creado por'); ?>:</span>
-                    <strong><?php echo htmlspecialchars($proyecto['creador'] ?? '-'); ?></strong>
-                </div>
-                
-                <?php if (!empty($proyecto['encargado_nombre'])): ?>
-                <div class="meta-item">
-                    <span class="meta-icon">🎯</span>
-                    <span class="meta-label"><?php echo traducir('Encargado'); ?>:</span>
-                    <strong><?php echo htmlspecialchars($proyecto['encargado_nombre']); ?></strong>
-                </div>
-                <?php endif; ?>
-            </div>
-            
-            <!-- Descripción colapsable -->
-            <?php if (!empty($proyecto['descripcion'])): ?>
-            <details class="proyecto-descripcion">
-                <summary><?php echo traducir('Descripción'); ?></summary>
-                <p><?php echo nl2br(htmlspecialchars($proyecto['descripcion'])); ?></p>
-            </details>
-            <?php endif; ?>
-        </div>
+        </details>
+        <?php endif; ?>
+        
+    </div>
         
         <!-- ============================================
              PROPUESTA TÉCNICA (PDF)
@@ -283,8 +410,7 @@ $error_msg = $_GET['error'] ?? '';
             <div class="propuesta-acciones">
                 <a href="<?php echo url('modules/proyectos/ver_propuesta.php?id=' . $proyecto_id); ?>" 
                    target="_blank" 
-                   class="btn-propuesta btn-propuesta-ver"
-                   title="<?php echo $_SESSION['idioma'] == 'pt' ? 'Ver no navegador' : 'Ver en el navegador'; ?>">
+                   class="btn-propuesta btn-propuesta-ver">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                         <circle cx="12" cy="12" r="3"/>
@@ -293,8 +419,7 @@ $error_msg = $_GET['error'] ?? '';
                 </a>
                 
                 <a href="<?php echo url('modules/proyectos/descargar_propuesta.php?id=' . $proyecto_id); ?>" 
-                   class="btn-propuesta btn-propuesta-descargar"
-                   title="<?php echo $_SESSION['idioma'] == 'pt' ? 'Baixar arquivo' : 'Descargar archivo'; ?>">
+                   class="btn-propuesta btn-propuesta-descargar">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                         <polyline points="7 10 12 15 17 10"/>
@@ -305,10 +430,12 @@ $error_msg = $_GET['error'] ?? '';
             </div>
         </div>
         <?php endif; ?>
+        <br>
         
         <!-- ============================================
-             STATS RÁPIDAS
+             STATS RÁPIDAS (solo si puede ver items)
              ============================================ -->
+        <?php if ($puede_ver_items): ?>
         <div class="stats-row">
             <div class="stat-mini">
                 <div class="stat-mini-value"><?php echo $total_items; ?></div>
@@ -327,6 +454,7 @@ $error_msg = $_GET['error'] ?? '';
                 <div class="stat-mini-label"><?php echo $_SESSION['idioma'] == 'pt' ? 'Entregues' : 'Entregados'; ?></div>
             </div>
         </div>
+        <?php endif; ?>
         
         <!-- ============================================
              TABS: ITEMS / HISTORIAL
@@ -335,21 +463,56 @@ $error_msg = $_GET['error'] ?? '';
             <div class="tabs-nav">
                 <button class="tab-btn active" data-tab="items" onclick="cambiarTab('items')">
                     📦 <?php echo traducir('Items del Proyecto'); ?>
-                    <span class="tab-count"><?php echo $total_items; ?></span>
+                    <?php if ($puede_ver_items): ?>
+                        <span class="tab-count"><?php echo $total_items; ?></span>
+                    <?php else: ?>
+                        <span class="tab-count" style="background:#f39c12;">🔒</span>
+                    <?php endif; ?>
                 </button>
                 <button class="tab-btn" data-tab="historial-proyecto" onclick="cambiarTab('historial-proyecto')">
                     📋 <?php echo traducir('Historial'); ?>
                     <span class="tab-count"><?php echo count($historial); ?></span>
                 </button>
+                <?php if ($puede_ver_items): ?>
                 <button class="tab-btn" data-tab="historial-items" onclick="cambiarTab('historial-items')">
                     🔄 <?php echo $_SESSION['idioma'] == 'pt' ? 'Histórico de Itens' : 'Historial de Items'; ?>
                     <span class="tab-count"><?php echo count($historial_items); ?></span>
                 </button>
+                <?php endif; ?>
             </div>
             
             <!-- ===== TAB: ITEMS ===== -->
             <div class="tab-panel active" id="tab-items">
-                <?php if (empty($items)): ?>
+                
+                <?php if (!$puede_ver_items): ?>
+                    <!-- Estado bloqueado -->
+                    <div class="empty-state" style="background:#fff3cd; border-left:4px solid #f39c12; padding:2rem; text-align:center;">
+                        <div class="empty-icon" style="font-size:3rem;">🔒</div>
+                        <h3 style="color:#856404; margin-bottom:0.5rem;">
+                            <?php echo $_SESSION['idioma'] == 'pt' ? 'Itens ocultos' : 'Items ocultos'; ?>
+                        </h3>
+                        <p style="color:#856404; max-width:500px; margin:0 auto 1rem;">
+                            <?php 
+                            if ($motivo_oculto === 'rechazado') {
+                                echo $_SESSION['idioma'] == 'pt' 
+                                    ? 'Este projeto foi rejeitado. Os itens não estão disponíveis para visualização.'
+                                    : 'Este proyecto fue rechazado. Los items no están disponibles para visualización.';
+                            } else {
+                                echo $_SESSION['idioma'] == 'pt' 
+                                    ? 'Os itens ficam disponíveis somente após o projeto ser aprovado pelo cliente.'
+                                    : 'Los items están disponibles solo después de que el proyecto sea aprobado por el cliente.';
+                            }
+                            ?>
+                        </p>
+                        <p style="font-size:0.9rem; color:#7f8c8d;">
+                            <?php echo $_SESSION['idioma'] == 'pt' ? 'Status atual' : 'Estado actual'; ?>:
+                            <span class="estado-badge estado-<?php echo $proyecto['estado']; ?>">
+                                <?php echo $estados_proyecto[$proyecto['estado']] ?? $proyecto['estado']; ?>
+                            </span>
+                        </p>
+                    </div>
+                    
+                <?php elseif (empty($items)): ?>
                     <div class="empty-state">
                         <div class="empty-icon">📦</div>
                         <p><?php echo traducir('No hay items en este proyecto'); ?></p>
@@ -359,6 +522,7 @@ $error_msg = $_GET['error'] ?? '';
                             </button>
                         <?php endif; ?>
                     </div>
+                    
                 <?php else: ?>
                     <div class="table-responsive">
                         <table class="tabla-items">
@@ -479,6 +643,7 @@ $error_msg = $_GET['error'] ?? '';
             </div>
             
             <!-- ===== TAB: HISTORIAL ITEMS ===== -->
+            <?php if ($puede_ver_items): ?>
             <div class="tab-panel" id="tab-historial-items">
                 <?php if (empty($historial_items)): ?>
                     <div class="empty-state">
@@ -520,6 +685,7 @@ $error_msg = $_GET['error'] ?? '';
                     </div>
                 <?php endif; ?>
             </div>
+            <?php endif; ?>
         </div>
     </div>
     
@@ -608,7 +774,7 @@ $error_msg = $_GET['error'] ?? '';
                     <div class="form-group">
                         <label><?php echo traducir('Producto seleccionado'); ?></label>
                         <input type="text" id="item-nombre" 
-                               placeholder="<?php echo $_SESSION['idioma'] == 'pt' ? 'Selecione ou digite um produto personalizado' : 'Seleccione o escriba un producto personalizado'; ?>" 
+                               placeholder="<?php echo $_SESSION['idioma'] == 'pt' ? 'Selecione ou digite um produto' : 'Seleccione o escriba un producto'; ?>" 
                                required>
                         <input type="hidden" id="item-producto-id" value="">
                     </div>
@@ -664,7 +830,6 @@ $error_msg = $_GET['error'] ?? '';
     <script>
     const PROYECTO_ID = <?php echo $proyecto_id; ?>;
     
-    // Traducciones para el modal
     const TRAD = {
         seleccionar: '<?php echo traducir('Seleccionar'); ?>',
         sinCategoria: '<?php echo traducir('Sin categoría'); ?>',
@@ -673,14 +838,14 @@ $error_msg = $_GET['error'] ?? '';
         buscandoProductos: '<?php echo traducir('Escriba para buscar productos...'); ?>',
         guardando: '<?php echo $_SESSION['idioma'] == 'pt' ? 'Salvando...' : 'Guardando...'; ?>',
         guardarTodos: '<?php echo traducir('Guardar todos los items'); ?>',
-        confirmarCerrar: '<?php echo $_SESSION['idioma'] == 'pt' ? 'Há itens pendentes sem salvar. Deseja fechar mesmo assim? Eles serão perdidos.' : 'Hay items pendientes sin guardar. ¿Desea cerrar de todas formas? Se perderán.'; ?>',
-        confirmarSumar: '<?php echo $_SESSION['idioma'] == 'pt' ? 'Este produto já está na lista. Deseja somar a quantidade?' : 'Este producto ya está en la lista. ¿Desea sumar la cantidad?'; ?>',
-        errorNombre: '<?php echo $_SESSION['idioma'] == 'pt' ? 'Selecione ou digite um produto' : 'Debe seleccionar o escribir un producto'; ?>',
+        confirmarCerrar: '<?php echo $_SESSION['idioma'] == 'pt' ? 'Há itens pendentes. Deseja fechar?' : 'Hay items pendientes. ¿Desea cerrar?'; ?>',
+        confirmarSumar: '<?php echo $_SESSION['idioma'] == 'pt' ? 'Produto já na lista. Somar quantidade?' : 'Producto ya en la lista. ¿Sumar cantidad?'; ?>',
+        errorNombre: '<?php echo $_SESSION['idioma'] == 'pt' ? 'Selecione ou digite um produto' : 'Seleccione o escriba un producto'; ?>',
         errorCantidad: '<?php echo $_SESSION['idioma'] == 'pt' ? 'A quantidade deve ser pelo menos 1' : 'La cantidad debe ser al menos 1'; ?>',
         errorFecha: '<?php echo $_SESSION['idioma'] == 'pt' ? 'Informe a data requerida' : 'Debe indicar la fecha requerida'; ?>',
-        sinItemsGuardar: '<?php echo $_SESSION['idioma'] == 'pt' ? 'Não há itens para salvar. Adicione pelo menos um.' : 'No hay items para guardar. Agregue al menos uno.'; ?>',
-        errorGuardar: '<?php echo $_SESSION['idioma'] == 'pt' ? 'Alguns itens não puderam ser salvos:' : 'Algunos items no se pudieron guardar:'; ?>',
-        nombreObligatorio: '<?php echo $_SESSION['idioma'] == 'pt' ? 'O nome do produto é obrigatório' : 'El nombre del producto es obligatorio'; ?>',
+        sinItemsGuardar: '<?php echo $_SESSION['idioma'] == 'pt' ? 'Não há itens para salvar.' : 'No hay items para guardar.'; ?>',
+        errorGuardar: '<?php echo $_SESSION['idioma'] == 'pt' ? 'Alguns itens falharam:' : 'Algunos items fallaron:'; ?>',
+        nombreObligatorio: '<?php echo $_SESSION['idioma'] == 'pt' ? 'O nome é obrigatório' : 'El nombre es obligatorio'; ?>',
         errorCrear: '<?php echo $_SESSION['idioma'] == 'pt' ? 'Erro' : 'Error'; ?>',
         nombre: '<?php echo traducir('Nombre'); ?>',
         cantidad: '<?php echo traducir('Cantidad'); ?>',
@@ -693,52 +858,27 @@ $error_msg = $_GET['error'] ?? '';
         return (window.TRAD && TRAD[key]) ? TRAD[key] : key;
     }
     
-    // ===== TABS =====
     function cambiarTab(tabName) {
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
         document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
         
-        document.querySelector(`.tab-btn[data-tab="${tabName}"]`).classList.add('active');
-        document.getElementById('tab-' + tabName).classList.add('active');
+        const btn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
+        if (btn) btn.classList.add('active');
+        
+        const panel = document.getElementById('tab-' + tabName);
+        if (panel) panel.classList.add('active');
     }
     
-    // ===== DROPDOWN REPORTES =====
-    function toggleDropdownReportes(e) {
-        if (e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-        const container = document.querySelector('.dropdown-reportes');
-        if (!container) return;
-        container.classList.toggle('abierto');
-    }
-    
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest('.dropdown-reportes')) {
-            document.querySelectorAll('.dropdown-reportes.abierto').forEach(el => el.classList.remove('abierto'));
-        }
-    });
-    
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            document.querySelectorAll('.dropdown-reportes.abierto').forEach(el => el.classList.remove('abierto'));
-        }
-    });
-    
-    // ===== ELIMINAR ITEM =====
     async function confirmarEliminarItem(itemId, nombre) {
         const idioma = '<?php echo $_SESSION['idioma']; ?>';
         const proyectoId = <?php echo $proyecto_id; ?>;
         
-        const mensaje = idioma === 'pt'
-            ? `Deseja excluir o item "${nombre}" deste projeto?`
-            : `¿Desea eliminar el item "${nombre}" de este proyecto?`;
-        
         const ok = await Confirm.show({
             titulo: idioma === 'pt' ? 'Excluir Item' : 'Eliminar Item',
-            mensaje: mensaje,
+            mensaje: idioma === 'pt'
+                ? `Deseja excluir o item "${nombre}"?`
+                : `¿Desea eliminar el item "${nombre}"?`,
             textoConfirmar: idioma === 'pt' ? 'Excluir' : 'Eliminar',
-            textoCancelar: idioma === 'pt' ? 'Cancelar' : 'Cancelar',
             tipo: 'danger'
         });
         
@@ -748,7 +888,6 @@ $error_msg = $_GET['error'] ?? '';
     }
     </script>
     <script src="<?php echo url('assets/js/modal_productos.js'); ?>"></script>
-    
     <?php include '../../includes/footer.php'; ?>
 </body>
 </html>

@@ -249,6 +249,25 @@ function traducir($texto) {
                 'Sin propuesta' => 'Sin propuesta',
                 'Archivo no encontrado' => 'Archivo no encontrado',
 
+                // ===== clientes ========
+
+                'Clientes' => 'Clientes',
+                'Nuevo Cliente' => 'Nuevo Cliente',
+                'Editar Cliente' => 'Editar Cliente',
+                'Responsables' => 'Responsables',
+                'Gestionar Responsables' => 'Gestionar Responsables',
+                'Fecha de Solicitud' => 'Fecha de Solicitud',
+                'Solicitante del Cliente' => 'Solicitante del Cliente',
+                'Solicitante' => 'Solicitante',
+                'Razón Social' => 'Razón Social',
+                'Cargo' => 'Cargo',
+                'Celular' => 'Celular',
+                'Sitio Web' => 'Sitio Web',
+                'Items ocultos' => 'Items ocultos',
+                'Los items están disponibles solo después de que el proyecto sea aprobado por el cliente.' => 'Los items están disponibles solo después de que el proyecto sea aprobado por el cliente.',
+                'Estado actual' => 'Estado actual',
+                'Rechazado' => 'Rechazado',
+
             ],
             'pt' => [
                 // ===== General / Nav =====
@@ -483,6 +502,25 @@ function traducir($texto) {
                 'Subido el' => 'Enviado em',
                 'Sin propuesta' => 'Sem proposta',
                 'Archivo no encontrado' => 'Arquivo não encontrado',
+
+                // ===== clientes =======
+
+                'Clientes' => 'Clientes',
+'Nuevo Cliente' => 'Novo Cliente',
+'Editar Cliente' => 'Editar Cliente',
+'Responsables' => 'Responsáveis',
+'Gestionar Responsables' => 'Gerenciar Responsáveis',
+'Fecha de Solicitud' => 'Data de Solicitação',
+'Solicitante del Cliente' => 'Solicitante do Cliente',
+'Solicitante' => 'Solicitante',
+'Razón Social' => 'Razão Social',
+'Cargo' => 'Cargo',
+'Celular' => 'Celular',
+'Sitio Web' => 'Site',
+'Items ocultos' => 'Itens ocultos',
+'Los items están disponibles solo después de que el proyecto sea aprobado por el cliente.' => 'Os itens ficam disponíveis somente após o projeto ser aprovado pelo cliente.',
+'Estado actual' => 'Status atual',
+'Rechazado' => 'Rejeitado',
             ]
         ];
     }

@@ -44,3 +44,12 @@ function requiereMaster() {
         exit();
     }
 }
+
+/**
+ * Verifica que el usuario pueda ver un proyecto o redirige.
+ */
+function requiereAccesoProyecto($proyecto) {
+    if (!$proyecto || !puedeVerProyecto($proyecto)) {
+        redirigir('modules/proyectos/index.php?error=sin_acceso');
+    }
+}

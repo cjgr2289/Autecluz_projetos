@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Sistema de Proyectos</title>
+    <title>Login - Sistema de Projetos</title>
     <link rel="stylesheet" href="<?php echo url('assets/css/style.css'); ?>">
     <link rel="stylesheet" href="<?php echo url('assets/css/login.css'); ?>">
     <link rel="stylesheet" href="<?php echo url('assets/css/formularios.css'); ?>">
@@ -62,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <body>
     <div class="login-container">
         <div class="login-box">
-            <h2>Sistema de Proyectos</h2>
+            <h2>Sist. Projetos Autecluz</h2>
             
             <?php if ($error): ?>
                 <div class="error-message"><?php echo htmlspecialchars($error); ?></div>
@@ -75,10 +75,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                            value="<?php echo htmlspecialchars($_POST['username'] ?? ''); ?>">
                 </div>
                 <div class="form-group">
-                    <label for="password">Contraseña</label>
+                    <label for="password">Senha</label>
                     <input type="password" id="password" name="password" required>
                 </div>
-                <button type="submit" class="btn-primary">Iniciar Sesión</button>
+                <button type="submit" class="btn-primary">Entrar</button>
             </form>
         </div>
     </div>

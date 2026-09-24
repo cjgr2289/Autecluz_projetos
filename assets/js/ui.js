@@ -235,6 +235,53 @@ document.addEventListener('keydown', function(e) {
 });
 
 // ============================================
+// MENÚ DE USUARIO
+// ============================================
+function toggleUserMenu(e) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    const container = document.querySelector('.nav-user-menu');
+    const dropdown = document.getElementById('user-dropdown');
+    if (!container || !dropdown) return;
+    
+    const estabaAbierto = container.classList.contains('abierto');
+    
+    if (estabaAbierto) {
+        container.classList.remove('abierto');
+        dropdown.style.display = 'none';
+    } else {
+        container.classList.add('abierto');
+        dropdown.style.display = 'block';
+    }
+}
+
+// Cerrar menú de usuario al hacer clic fuera
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.nav-user-menu')) {
+        const menu = document.querySelector('.nav-user-menu');
+        const dropdown = document.getElementById('user-dropdown');
+        if (menu) menu.classList.remove('abierto');
+        if (dropdown) dropdown.style.display = 'none';
+    }
+});
+
+// Cerrar con ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const menu = document.querySelector('.nav-user-menu');
+        const dropdown = document.getElementById('user-dropdown');
+        if (menu) menu.classList.remove('abierto');
+        if (dropdown) dropdown.style.display = 'none';
+    }
+});
+
+// Exponer globalmente
+window.toggleUserMenu = toggleUserMenu;
+
+// ============================================
 // HELPERS
 // ============================================
 function escapeHtml(text) {

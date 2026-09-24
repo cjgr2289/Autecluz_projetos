@@ -6,6 +6,7 @@ $idioma_actual = $_SESSION['idioma'] ?? 'es';
 <html lang="<?php echo $idioma_actual; ?>">
 <head>
     <meta charset="UTF-8">
+    <link rel="shortcut icon" href="assets/images/favicon.ico" type="image/x-icon">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
     <!-- CSS modular con rutas dinámicas -->
@@ -41,6 +42,10 @@ $idioma_actual = $_SESSION['idioma'] ?? 'es';
                 <?php if (esMaster()): ?>
                 <li><a href="<?php echo url('modules/usuarios/index.php'); ?>"><?php echo traducir('Usuarios'); ?></a></li>
                 <?php endif; ?>
+
+                <li><a href="<?php echo url('modules/clientes/index.php'); ?>">
+                    <?php echo $_SESSION['idioma'] == 'pt' ? 'Clientes' : 'Clientes'; ?>
+                </a></li>
                 
                 <!-- Menú de perfil de usuario -->
                 <li class="nav-user-menu">
