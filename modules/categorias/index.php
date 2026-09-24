@@ -49,6 +49,7 @@ $mensaje = $_GET['mensaje'] ?? '';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+     <link rel="shortcut icon" href="../../assets/images/favicon.ico" type="image/x-icon">
     <title><?php echo traducir('Categorias'); ?> - Sistema</title>
     <link rel="stylesheet" href="../../assets/css/style.css">
     <link rel="stylesheet" href="../../assets/css/navbar.css">

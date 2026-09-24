@@ -20,6 +20,7 @@ $proyecto_id = $propuesta['proyecto_id'];
 <head>
     <meta charset="UTF-8">
     <title><?php echo htmlspecialchars($propuesta['numero']); ?></title>
+    <link rel="shortcut icon" href="../../../assets/images/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="<?php echo url('assets/css/style.css'); ?>">
     <link rel="stylesheet" href="<?php echo url('assets/css/navbar.css'); ?>">
     <link rel="stylesheet" href="<?php echo url('assets/css/badges.css'); ?>">
